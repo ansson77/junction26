@@ -879,6 +879,49 @@ APPLICANTS = [
         ("breed cattle", 3, "I took care of calving and the breeding records."),
         ("drive vehicles", 3, "I drive tractors and farm vehicles."),
     ]),
+
+    # --- Process development ("Manual ways of working" job from the bizdev:manual_work template;
+    # skills: analyse business processes, business analysis, improve business processes,
+    # business processes, apply change management) ---
+    ("mock-applicant-087", "process job strong fit (same skills, same priorities)", [
+        ("analyse business processes", 3, "I mapped the order-to-delivery process of a wholesaler and found that approvals caused most of the waiting."),
+        ("improve business processes", 2, "I cut the order handling time from five days to two by removing double approvals."),
+        ("business analysis", 2, "I interviewed sales, warehouse and finance staff to find out what each team really needed."),
+        ("business processes", 2, "I wrote the standard process and checklists that every team now follows."),
+        ("apply change management", 1, "I trained the teams in the new process and collected their feedback for the first month."),
+    ]),
+    ("mock-applicant-088", "process job strong fit (same skills, other priorities, change-focused)", [
+        ("apply change management", 3, "I led the move of 40 office workers from paper forms to a shared digital workflow."),
+        ("improve business processes", 3, "I standardised how invoices are handled in three offices, so the work is done the same way everywhere."),
+        ("analyse business processes", 2, "I drew the invoice process as a flowchart and measured how long each step took."),
+        ("business processes", 2, ""),
+    ]),
+    ("mock-applicant-089", "process job near fit (Lean Six Sigma in manufacturing)", [
+        ("analyse production processes for improvement", 3, "I found the bottleneck on a packaging line with time studies and raised output by 15%."),
+        ("six sigma methods", 2, "I have a Green Belt and ran three improvement projects with the DMAIC method."),
+        ("statistical process control", 2, "I set up control charts to follow the defect rate every week."),
+        ("continuous improvement philosophies", 2, "I ran weekly Kaizen meetings with the production team."),
+        ("create flowchart diagram", 1, "I drew the process maps for our quality manual."),
+    ]),
+    ("mock-applicant-090", "process job near fit (automation and data, tool-focused)", [
+        ("develop ICT workflow", 3, "I built automated workflows in Power Automate that replaced manual copying between Excel and our ERP."),
+        ("perform data analysis", 3, "I made a Power BI report that shows the lead time and error rate of every order."),
+        ("business process modelling", 2, "I modelled our purchase process in BPMN before automating it."),
+        ("Python (computer programming)", 2, "I wrote small Python scripts to clean and combine reports."),
+    ]),
+    ("mock-applicant-091", "process job career changer (logistics shift supervisor)", [
+        ("lean project management", 3, "As a warehouse shift supervisor I reorganised picking so walking distances got much shorter."),
+        ("improve business processes", 3, "Every shift used to work differently; I made one standard way and wrote it down."),
+        ("use spreadsheets software", 2, "I tracked picking errors and delays in Excel and shared the numbers weekly."),
+        ("write work-related reports", 2, "I wrote monthly reports on errors and delays for the warehouse manager."),
+    ]),
+    ("mock-applicant-092", "process job partial fit, international (German, English)", [
+        ("analyse business processes", 4, "I worked as a process analyst for a logistics company in Hamburg for four years."),
+        ("manage quality", 2, "I was responsible for our ISO 9001 process documentation."),
+        ("business analysis", 2, "I collected requirements for a new warehouse system from users."),
+        ("German", 1, "German is my first language."),
+        ("English", 1, "I worked in English with teams in several countries."),
+    ]),
 ]
 
 
