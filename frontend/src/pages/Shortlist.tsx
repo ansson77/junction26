@@ -165,18 +165,6 @@ function JobShortlist({ id }: { id: string }) {
         </section>
       )}
 
-      {job.data && (
-        <div className="job-skills-strip">
-          <span className="small muted">You ranked:</span>
-          {job.data.skills.map((s) => (
-            <span key={s.uri} className="chip-static">
-              {s.label} <strong>{s.points}</strong>
-              {s.priority === "must_have" && <span className="must-dot" title="Must have" />}
-            </span>
-          ))}
-        </div>
-      )}
-
       {matches.data && (
         <div className="stats">
           <div>
@@ -223,7 +211,7 @@ function JobShortlist({ id }: { id: string }) {
           <span className="switch-track" aria-hidden />
           <span className="small">
             <strong>Anonymous applications</strong>
-            <span className="muted"> · {anonymous ? "skills only" : "names shown (demo names)"}</span>
+            <span className="muted"> · {anonymous ? "skills only" : "names shown"}</span>
           </span>
         </label>
       </div>
@@ -276,13 +264,8 @@ function JobShortlist({ id }: { id: string }) {
                     </span>
                   </span>
                   <span className="sl-applicant" role="cell">
-                    {anonymous ? (
-                      <span className="mono">{aid}</span>
-                    ) : (
-                      <span className="sl-name">
-                        {demoName(aid)} <span className="mono muted small">{aid}</span>
-                      </span>
-                    )}
+                    {/* Anonymous: the name line stays, blank, so rows keep the same height. */}
+                    <span className="sl-name">{anonymous ? " " : demoName(aid)}</span>
                     <span className="small muted clamp1">{skillsOf[aid]}</span>
                   </span>
                   <span className="sl-num" role="cell">
