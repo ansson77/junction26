@@ -5,6 +5,7 @@ import EspooLogo from "./components/EspooLogo";
 import ApplicantFlow from "./pages/ApplicantFlow";
 import EmployerFlow from "./pages/EmployerFlow";
 import BizDevFlow from "./pages/BizDevFlow";
+import Shortlist from "./pages/Shortlist";
 import { JobDetail, JobList } from "./pages/Jobs";
 import { ApplicantDetail, ApplicantList } from "./pages/Applicants";
 
@@ -27,6 +28,7 @@ export default function App() {
           <NavLink to="/applicant/new">Applicant</NavLink>
           <NavLink to="/employer/new">Employer</NavLink>
           <NavLink to="/bizdev">Business</NavLink>
+          <NavLink to="/shortlist">Shortlist</NavLink>
           <NavLink to="/jobs">Jobs</NavLink>
           <NavLink to="/applicants">Applicants</NavLink>
         </nav>
@@ -37,6 +39,8 @@ export default function App() {
           <Route path="/applicant/new" element={<Fresh><ApplicantFlow /></Fresh>} />
           <Route path="/employer/new" element={<Fresh><EmployerFlow /></Fresh>} />
           <Route path="/bizdev" element={<Fresh><BizDevFlow /></Fresh>} />
+          <Route path="/shortlist" element={<Shortlist />} />
+          <Route path="/shortlist/:id" element={<Shortlist />} />
           <Route path="/jobs" element={<JobList />} />
           <Route path="/jobs/:id" element={<JobDetail />} />
           <Route path="/applicants" element={<ApplicantList />} />

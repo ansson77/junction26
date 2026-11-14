@@ -586,7 +586,7 @@ function PublishJob({ output }: { output: SkillRequirements }) {
         <p>
           <strong>{title}</strong> is now matched against applicants' self-ranked skills.
         </p>
-        <Link className="btn primary" to={`/jobs/${encodeURIComponent(saved)}`}>
+        <Link className="btn primary" to={`/shortlist/${encodeURIComponent(saved)}`}>
           See matching people
         </Link>
       </section>

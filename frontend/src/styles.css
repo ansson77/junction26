@@ -624,3 +624,96 @@ blockquote {
 }
 .biz-skill { flex-wrap: wrap; }
 .biz-skill-tasks { flex-basis: 100%; }
+
+/* ---------- Shortlist ---------- */
+
+.job-skills-strip { display: flex; flex-wrap: wrap; gap: 0.4rem; align-items: center; margin: 0.5rem 0 1rem; }
+.chip-static {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.15rem 0.6rem;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface);
+  font-size: 0.85rem;
+}
+.chip-static strong { color: var(--accent); }
+.must-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--accent); }
+
+.stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0.75rem; margin: 1rem 0; }
+.stats > div { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 0.75rem 1rem; }
+.stat-num { font-size: 1.6rem; font-weight: 700; font-variant-numeric: tabular-nums; }
+.filters { display: flex; gap: 1.25rem; flex-wrap: wrap; margin: 0.5rem 0 1rem; }
+
+.shortlist { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
+.sl-row {
+  display: grid;
+  grid-template-columns: 2rem 11rem minmax(0, 1.4fr) 6.5rem 5.5rem minmax(0, 2fr);
+  gap: 1rem;
+  align-items: center;
+  width: 100%;
+  padding: 0.7rem 1rem;
+  background: none;
+  border: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+}
+button.sl-row { cursor: pointer; }
+button.sl-row:hover { background: var(--surface-2); }
+.sl-head {
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--muted);
+  border-bottom: 1px solid var(--border);
+  padding-top: 0.55rem;
+  padding-bottom: 0.55rem;
+}
+.sl-item + .sl-item { border-top: 1px solid var(--border); }
+.sl-item.open { background: var(--surface-2); }
+.sl-rank { font-weight: 700; color: var(--muted); }
+.sl-score { display: flex; align-items: center; gap: 0.6rem; }
+.score-num { font-size: 1.6rem; font-weight: 800; font-variant-numeric: tabular-nums; width: 2.6rem; text-align: right; }
+.score-side { display: flex; flex-direction: column; gap: 0.25rem; flex: 1; min-width: 0; }
+.score-bar { display: block; height: 6px; border-radius: 3px; background: var(--surface-2); overflow: hidden; }
+.score-bar > span { display: block; height: 100%; border-radius: 3px; }
+.score-num.tier-strong { color: var(--good); }
+.score-num.tier-partial { color: var(--similar); }
+.score-num.tier-weak { color: var(--muted); }
+.score-bar .tier-strong { background: var(--good); }
+.score-bar .tier-partial { background: var(--similar); }
+.score-bar .tier-weak { background: var(--muted); }
+.sl-applicant { display: flex; flex-direction: column; min-width: 0; }
+.mono { font-family: ui-monospace, monospace; font-size: 0.85rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.clamp1 { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sl-num { text-align: right; font-variant-numeric: tabular-nums; }
+.sl-skills { display: flex; flex-wrap: wrap; gap: 0.3rem; }
+.mini { display: inline-block; font-size: 0.75rem; padding: 0 0.45rem; border-radius: 4px; white-space: nowrap; }
+.mini-same { background: var(--good-soft); color: var(--good); }
+.mini-similar { background: var(--similar-soft); color: var(--similar); }
+.sl-detail { padding: 0 1rem 1rem 4rem; }
+.legend { margin-top: 1rem; max-width: 52rem; }
+
+@media (max-width: 860px) {
+  .sl-head { display: none; }
+  .sl-row {
+    grid-template-columns: 1.5rem minmax(0, 1fr) auto;
+    grid-template-areas: "rank score must" "rank who covered" "rank skills skills";
+    row-gap: 0.4rem;
+  }
+  .sl-rank { grid-area: rank; align-self: start; padding-top: 0.4rem; }
+  .sl-score { grid-area: score; }
+  .sl-applicant { grid-area: who; }
+  .sl-row > .sl-num:nth-of-type(4) { grid-area: covered; }
+  .sl-row > .sl-num:nth-of-type(5) { grid-area: must; }
+  .sl-row > .sl-num:nth-of-type(4)::after { content: " pts"; color: var(--muted); }
+  .sl-row > .sl-num:nth-of-type(5)::after { content: " must"; color: var(--muted); }
+  .sl-skills { grid-area: skills; }
+  .sl-detail { padding: 0 1rem 1rem; }
+  .stats { gap: 0.5rem; }
+  .stats > div { padding: 0.5rem 0.6rem; }
+  .stat-num { font-size: 1.2rem; }
+}

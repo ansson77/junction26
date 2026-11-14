@@ -102,6 +102,9 @@ export function JobDetail() {
         <section>
           <div className="row-between">
             <h2>Applicants, best match first</h2>
+            <Link className="btn small" to={`/shortlist/${encodeURIComponent(id)}`}>
+              Open shortlist
+            </Link>
             <label className="inline small">
               <input type="checkbox" checked={showAll} onChange={(e) => setShowAll(e.target.checked)} /> show
               non-matches
@@ -148,7 +151,7 @@ function ApplicantMatch({ rank, result }: { rank: number; result: MatchResult })
 }
 
 /** The applicant's own words, verbatim. Loaded when the card is opened. */
-function ApplicantAnswers({ id }: { id: string }) {
+export function ApplicantAnswers({ id }: { id: string }) {
   const { data, error, loading } = useLoad(() => api.applicants.get(id), [id]);
   if (loading) return <Spinner />;
   if (error) return <ErrorBox error={error} />;

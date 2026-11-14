@@ -320,7 +320,7 @@ export default function EmployerFlow() {
             <Link className="btn" to="/employer/new">
               New job
             </Link>
-            <Link className="btn primary" to={`/jobs/${encodeURIComponent(saved.id)}`}>
+            <Link className="btn primary" to={`/shortlist/${encodeURIComponent(saved.id)}`}>
               See matching applicants
             </Link>
           </div>
