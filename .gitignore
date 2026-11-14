@@ -1,2 +1,4 @@
 esco
 RESEARCH.md
+.venv
+__pycache__/
