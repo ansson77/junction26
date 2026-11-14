@@ -24,15 +24,26 @@ then presented to the recruiter, and they rank them.
 
 1. Applicant enters their linkedin or CV.
 
-2. Their ESCO skills are extracted. Applicant can correct or add.
+2. ESCO skills are suggested from their text. These are only
+suggestions: the applicant confirms, removes or adds every skill.
 
-3. Applicant is grilled on some of the skills: what evidence is
-there?
+3. Applicant must choose a set amount of skills (5), and they get 10
+points to allocate to each one based on their expertise.
 
-4. Applicant must choose a set amount of skills, and they get 10(ish) points to allocate to each one based on their expertise.
+4. Each chosen skill gets a validation question ("describe one time
+you used this skill"). The question is generated from the ESCO skill
+only, never from applicant data. The applicant's answer is shown
+verbatim to recruiters and is never passed to an LLM.
+
+**AI Act principle:** our AI never evaluates applicants (Annex III
+4(a), high-risk). AI helps applicants describe themselves and helps
+employers describe jobs; all judging of people is done by humans.
+Profiles are pure self-declaration.
 
 5. Employees are shortlisted by their skills, their weighting of them.
-Additional options like visa-eligibility can be added.
+Additional options like visa-eligibility can be added. The matching is
+a transparent rule over self-declared skills and points (no AI
+scoring), and recruiters can see why each person matched.
 
 6. Event happens.
 

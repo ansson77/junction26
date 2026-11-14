@@ -120,7 +120,7 @@ class SkillMapper:
         self.selector = selector  # "decisions" or "llm"
         self.index = index or SkillIndex()
 
-    def _generate(self, system, user, schema):
+    def generate(self, system, user, schema):
         response = self.client.models.generate_content(
             model=self.model,
             contents=user,
@@ -135,25 +135,48 @@ class SkillMapper:
 
     def extract_statements(self, text, role="applicant"):
         """Step 1: text -> [Statement]."""
-        result = self._generate(EXTRACT_PROMPT[role], text, Extraction)
+        result = self.generate(EXTRACT_PROMPT[role], text, Extraction)
         return result.statements
 
     def retrieve(self, statements, k=CANDIDATES_PER_STATEMENT):
         """Step 2: [Statement] -> one candidate list per statement."""
         return self.index.search_many([s.esco_phrase for s in statements], k=k)
 
-    def select_skills(self, statements, candidates):
-        """Step 3. Returns [(statement_idx, skill, confidence)]."""
+    def select_skills(self, statements, candidates, mode="evidence"):
+        """Step 3. Returns [(statement_idx, skill, confidence)].
+
+        mode="evidence":    the evidence quote must show the skill (applicant claims, raw job ads).
+        mode="requirement": the statement phrase is an already-clarified requirement and is
+                            authoritative; the evidence (task) is only context (employer.py)."""
         if self.selector == "decisions":
-            return self.select_skills_decisions(statements, candidates)
+            return self.select_skills_decisions(statements, candidates, mode)
         return self.select_skills_llm(statements, candidates)
 
-    def select_skills_decisions(self, statements, candidates):
+    def select_skills_decisions(self, statements, candidates, mode="evidence"):
         """Step 3 via the Gemini Decisions API: one independent yes/no question per
         (statement, candidate) pair, answered with a calibrated probability.
         A statement can match several skills or none."""
-        shared_input = "Skill statements extracted from a text:\n" + "\n".join(
-            f'{i}. "{s.esco_phrase}" (evidence: "{s.evidence}")' for i, s in enumerate(statements)
+        if mode == "requirement":
+            header = "Required skills for a job, each with the task it is needed for:"
+            ask = ("Is this ESCO skill or knowledge the same as the required skill (or the core knowledge it is built on), "
+                   "in the context of the task?")
+            criteria = {
+                "true_description": "Yes: it names the same skill, technology or knowledge as the requirement, or the core knowledge it is built on.",
+                "false_description": "No: it is a different skill, technology or field (even if it shares words), or a specialisation for a different context than the task.",
+            }
+            context = "task"
+        else:
+            header = "Skill statements extracted from a text:"
+            ask = ("Based on the statement and its evidence, does the person have (or does the job require) "
+                   "this ESCO skill or knowledge?")
+            criteria = {
+                "true_description": "Yes: the evidence directly shows this exact skill, or the core knowledge it is built on. A recruiter reading the evidence would agree without guessing.",
+                "false_description": "No: it is a different skill or field (even if it shares words, e.g. oil pipelines vs data pipelines), a narrower specialisation for a different context (e.g. 'train crew members' for training office staff), or merely plausible rather than shown.",
+            }
+            context = "evidence"
+
+        shared_input = header + "\n" + "\n".join(
+            f'{i}. "{s.esco_phrase}" ({context}: "{s.evidence}")' for i, s in enumerate(statements)
         )
         questions, keys = {}, {}
         for i, (stmt, cands) in enumerate(zip(statements, candidates)):
@@ -163,16 +186,12 @@ class SkillMapper:
                 questions[key] = {
                     "type": "noul",
                     "instructions": (
-                        f'Statement {i}: "{stmt.esco_phrase}" (evidence: "{stmt.evidence}").\n'
+                        f'Statement {i}: "{stmt.esco_phrase}" ({context}: "{stmt.evidence}").\n'
                         f'ESCO {"knowledge item" if c["skillType"] == "knowledge" else "skill"}: '
                         f'"{c["label"]}": {c["description"][:300]}\n'
-                        "Based on the statement and its evidence, does the person have (or does the job require) "
-                        "this ESCO skill or knowledge?"
+                        + ask
                     ),
-                    "criteria": {
-                        "true_description": "Yes: the evidence directly shows this exact skill, or the core knowledge it is built on. A recruiter reading the evidence would agree without guessing.",
-                        "false_description": "No: it is a different skill or field (even if it shares words, e.g. oil pipelines vs data pipelines), a narrower specialisation for a different context (e.g. 'train crew members' for training office staff), or merely plausible rather than shown.",
-                    },
+                    "criteria": criteria,
                 }
 
         # Max 1,000 questions per request.
@@ -209,7 +228,7 @@ class SkillMapper:
                 lines.append(f"    {i}.{j}: {c['label']} [{c['skillType']}] - {desc}")
             blocks.append("\n".join(lines))
 
-        result = self._generate(SELECT_PROMPT, "\n\n".join(blocks), Selection)
+        result = self.generate(SELECT_PROMPT, "\n\n".join(blocks), Selection)
 
         picks = []
         for p in result.picks:
