@@ -6,7 +6,7 @@ Helou pöytäläiset! We match applicants and employers on real job requirements
 
 Both sides describe themselves in plain language. The AI turns that text into [ESCO](https://esco.ec.europa.eu/) skills, and the person then decides what is true.
 
-- **Applicant:** CV or free text → AI suggests skills → applicant keeps, removes or adds skills → spends 10 points on at most 5 skills → answers one validation question per skill in their own words.
+- **Applicant:** CV or free text → AI suggests skills → applicant keeps, removes or adds skills → spends 10 points on at most 5 skills → answers one validation question for each of the 2 skills with the most points, in their own words.
 - **Employer:** job ad or task list → AI asks clarifying questions (up to 2 rounds) → concrete tasks with priorities → ESCO skills → recruiter spends 10 points on the skills that matter most.
 
 **Matching:** both sides spend 10 points, so each profile is a priority distribution over ESCO skills. The score is a *soft cosine* between the two distributions: similar but different ESCO skills count partly (e.g. *troubleshoot* ≈ *debug software*), using calibrated similarities between the precomputed skill embeddings. Next to the score, *coverage* says how many of the employer's 10 points the applicant covers, and every employer skill is explained ("covered by X", "similar to Y", "not covered"). Matching is a fixed formula over skill data, with no LLM.
@@ -171,10 +171,10 @@ Clarification runs in rounds. Call `clarify` first. If `is_clear_enough` is fals
 |---|---|---|---|
 | `POST /api/applicant/suggest` | `{text}` | `ApplicantFlow.suggest_skills` | AI suggestions, each with `uri`, `label`, `skillType`, `evidence` (quotes from the text) |
 | `GET /api/applicant/search?q=...&k=5` | — | `ApplicantFlow.search_skills` | Matching skills, each with `uri`, `label`, `skillType`, `description`, `score`. No Gemini |
-| `POST /api/applicant/questions` | `{skills: [{uri}], language: "English"}` | `ApplicantFlow.questions_for` | `{uri: question}` |
+| `POST /api/applicant/questions` | `{allocation: {uri: points}, language: "English"}` | `skills_to_validate` + `ApplicantFlow.questions_for` | `{uri: question}` for the 2 skills with the most points (ties: first in `allocation`) |
 | `POST /api/applicant/profile` | `{skills, allocation: {uri: points}, questions: {uri: question}, answers: {uri: answer}}` | `make_applicant_profile` + `db.save_applicant` | `{id, profile: ApplicantProfile}` |
 
-`skills` lists the confirmed skills, each with `uri`, `label`, `skillType` and `origin` (`"suggested"` for a kept AI suggestion, `"added"` for one found with search). The applicant confirms suggestions before spending points, so only confirmed skills are sent.
+`skills` lists the confirmed skills, each with `uri`, `label`, `skillType` and `origin` (`"suggested"` for a kept AI suggestion, `"added"` for one found with search). The applicant confirms suggestions before spending points, so only confirmed skills are sent. Call `/questions` after the points are spent, since the points decide which skills get a question. `/profile` keeps questions and answers only for those top skills and ignores any others.
 
 **Stored profiles and matching**
 

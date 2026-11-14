@@ -146,13 +146,21 @@ def test_applicant_flow(client, index):
     hits = client.get("/api/applicant/search", params={"q": "bookkeeping", "k": 3}).json()
     assert len(hits) == 3 and {"uri", "label", "description", "score"} <= hits[0].keys()
 
-    uris = [s[0]["uri"], hits[0]["uri"]]
-    q = client.post("/api/applicant/questions", json={"skills": [{"uri": u} for u in uris]}).json()
-    assert set(q) == set(uris)
+    # Questions only for the 2 skills with the most points.
+    uris = [s[0]["uri"], hits[0]["uri"], hits[1]["uri"]]
+    q = client.post("/api/applicant/questions",
+                    json={"allocation": {uris[0]: 2, uris[1]: 5, uris[2]: 3}}).json()
+    assert set(q) == {uris[1], uris[2]}
 
     saved = make_applicant(client, index, {"debug software": 6, "JavaScript": 4})
     profile = client.get(f"/api/applicants/{saved['id']}").json()
     assert {x["validation_answer"] for x in profile["skills"]} == {"I did it once."}
+
+
+def test_only_top_skills_keep_answers(client, index):
+    saved = make_applicant(client, index, {"debug software": 2, "JavaScript": 5, "accounting": 3})
+    answered = {x["label"]: x["validation_answer"] for x in saved["profile"]["skills"]}
+    assert answered == {"JavaScript": "I did it once.", "accounting": "I did it once.", "debug software": ""}
 
 
 def test_applicant_max_skills_is_422(client, index):
@@ -166,7 +174,7 @@ def test_applicant_max_skills_is_422(client, index):
 
 
 def test_unknown_uri_is_422(client):
-    r = client.post("/api/applicant/questions", json={"skills": [{"uri": "http://example.com/nope"}]})
+    r = client.post("/api/applicant/questions", json={"allocation": {"http://example.com/nope": 10}})
     assert r.status_code == 422
 
 

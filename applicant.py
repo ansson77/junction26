@@ -12,7 +12,8 @@ Flow (PLAN.md, applicant steps 1-4):
   1. suggest_skills(text)        AI suggestions from CV / LinkedIn / free text (map_skills.py)
   2. search_skills(query)        applicant adds skills the AI missed (embedding search)
   3. allocation {uri: points}    applicant spends POINT_BUDGET points on <= MAX_SKILLS skills (points.py)
-  4. validation_questions(...)   one question per chosen skill; the applicant answers in their own words
+  4. validation_questions(...)   one question for each of the VALIDATED_SKILLS (2) skills with the most
+                                 points (skills_to_validate); the applicant answers in their own words
   5. make_applicant_profile()    confirmed skills + allocation + questions + answers -> ApplicantProfile
 
 Usage:
@@ -35,6 +36,7 @@ ROOT = Path(__file__).resolve().parent
 QUESTION_CACHE = ROOT / "data" / "validation_questions.json"
 
 MAX_SKILLS = 5
+VALIDATED_SKILLS = 2  # validation questions only for the skills with the most points
 
 
 # ---------- Profile (what gets stored and shown to recruiters) ----------
@@ -62,6 +64,13 @@ class ApplicantProfile(BaseModel):
         return self
 
 
+def skills_to_validate(allocation):
+    """The URIs that get a validation question: the VALIDATED_SKILLS skills with the most points
+    (1 if the applicant chose only one skill). Ties go to the skill listed first in `allocation`."""
+    ranked = sorted((uri for uri, p in allocation.items() if p > 0), key=lambda uri: -allocation[uri])
+    return ranked[:VALIDATED_SKILLS]
+
+
 def make_applicant_profile(skills, allocation, questions, answers=None):
     """Build the profile from what the applicant decided. Mirror of employer.make_job_profile.
 
@@ -73,6 +82,7 @@ def make_applicant_profile(skills, allocation, questions, answers=None):
 
     Raises ValueError if the allocation breaks the rules (budget, max skills, unknown skill)."""
     answers = answers or {}
+    validated = set(skills_to_validate(allocation))
     by_uri = {s["uri"]: s for s in skills}
     unknown = set(allocation) - set(by_uri)
     if unknown:
@@ -84,8 +94,9 @@ def make_applicant_profile(skills, allocation, questions, answers=None):
             skillType=by_uri[uri]["skillType"],
             origin=by_uri[uri].get("origin", "suggested"),
             points=p,
-            validation_question=questions.get(uri, ""),
-            validation_answer=answers.get(uri, ""),
+            # Only the top skills are validated; questions/answers for other skills are ignored.
+            validation_question=questions.get(uri, "") if uri in validated else "",
+            validation_answer=answers.get(uri, "") if uri in validated else "",
         )
         for uri, p in allocation.items() if p > 0
     ]
@@ -218,11 +229,16 @@ def run_cli(flow, text, language):
     chosen = [confirmed[i] for i in allocation]
     points_by_uri = {confirmed[i]["uri"]: p for i, p in allocation.items()}
 
-    # 4. Validation questions (skill data only) and the applicant's answers (never sent to an LLM)
-    questions = flow.questions_for(chosen, language)
-    print("\nOne question per skill. Recruiters read your answers as you write them; no AI evaluates them.\n")
+    # 4. Validation questions for the top skills only (skill data only),
+    #    and the applicant's answers (never sent to an LLM)
+    validate = skills_to_validate(points_by_uri)
+    to_ask = [c for c in chosen if c["uri"] in validate]
+    to_ask.sort(key=lambda c: validate.index(c["uri"]))
+    questions = flow.questions_for(to_ask, language)
+    print("\nOne question about each of your strongest skills. Recruiters read your answers as you "
+          "write them; no AI evaluates them.\n")
     answers = {}
-    for c in chosen:
+    for c in to_ask:
         print(f"{c['label']}: {questions[c['uri']]}")
         answers[c["uri"]] = ask("  > ")
     return make_applicant_profile(confirmed, points_by_uri, questions, answers)
@@ -232,8 +248,9 @@ def print_recruiter_card(profile):
     print("\n=== Skill card (as recruiters see it) ===")
     for s in sorted(profile.skills, key=lambda s: -s.points):
         print(f"\n{points_bar(s.points)}  {s.points:>2}  {s.label}")
-        print(f"  Q: {s.validation_question}")
-        print(f"  A: {s.validation_answer or '(not answered)'}")
+        if s.validation_question:
+            print(f"  Q: {s.validation_question}")
+            print(f"  A: {s.validation_answer or '(not answered)'}")
 
 
 def main():

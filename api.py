@@ -34,7 +34,7 @@ from google.genai import errors as genai_errors
 from pydantic import BaseModel, Field, ValidationError
 
 import db
-from applicant import ApplicantFlow, ApplicantProfile, make_applicant_profile
+from applicant import ApplicantFlow, ApplicantProfile, make_applicant_profile, skills_to_validate
 from employer import QA, Clarification, EmployerFlow, JobProfile, JobSpec, make_job_profile
 from matching import MatchResult, SkillSimilarity, rank_applicants, rank_jobs
 
@@ -106,12 +106,9 @@ class SearchHit(BaseModel):
     score: float
 
 
-class SkillRef(BaseModel):
-    uri: str
-
-
 class QuestionsIn(BaseModel):
-    skills: list[SkillRef]
+    allocation: dict[str, int] = Field(description="The applicant's {uri: points}. Questions are returned only "
+                                                   "for the skills with the most points (skills_to_validate).")
     language: str = "English"
 
 
@@ -239,10 +236,11 @@ def search(request: Request, q: str = Query(min_length=1), k: int = Query(5, ge=
 
 @applicant.post("/questions", response_model=dict[str, str])
 def questions(body: QuestionsIn, request: Request):
-    """Step 3: one validation question per chosen skill, {uri: question}. Generated from the
-    ESCO skill only (no applicant data) and cached, so everyone gets the same question."""
-    uris = [s.uri for s in body.skills]
-    check_known(request, uris)
+    """Step 3: validation questions for the 1-2 skills with the most points, {uri: question}.
+    Generated from the ESCO skill only (no applicant data) and cached, so everyone gets the
+    same question."""
+    check_known(request, body.allocation)
+    uris = skills_to_validate(body.allocation)
     with _questions_lock:
         return request.app.state.applicant.questions_for([{"uri": u} for u in uris], body.language)
 

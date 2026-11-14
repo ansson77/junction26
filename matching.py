@@ -132,7 +132,9 @@ def explain(result):
     for l in result.links:
         if l.similarity == 0:
             lines.append(f"  - {l.job_skill} (job: {l.job_points}): not covered")
-        elif l.similarity == 1:
+        elif l.applicant_skill_uri == l.job_skill_uri:
+            # Same ESCO skill. (A different but near-identical skill can also reach similarity 1;
+            # it is shown with its own name below.)
             lines.append(f"  + {l.job_skill} (job: {l.job_points}, applicant: {l.applicant_points})")
         else:
             lines.append(f"  ~ {l.job_skill} (job: {l.job_points}) <- {l.applicant_skill} "

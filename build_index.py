@@ -50,10 +50,12 @@ def load_model(name=MODEL_NAME):
 
 def load_skills(limit=None):
     with open(SKILLS_CSV, newline="", encoding="utf-8") as f:
-        rows = [
-            r for r in csv.DictReader(f)
-            if r["skillType"] and r["status"] == "released"
-        ]
+        rows, seen = [], set()
+        for r in csv.DictReader(f):
+            # The CSV lists a few skills twice; keep the first row per URI.
+            if r["skillType"] and r["status"] == "released" and r["conceptUri"] not in seen:
+                seen.add(r["conceptUri"])
+                rows.append(r)
     return rows[:limit] if limit else rows
 
 

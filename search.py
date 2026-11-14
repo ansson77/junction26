@@ -28,10 +28,18 @@ class SkillIndex:
     def __init__(self):
         if not VECTORS_PATH.exists():
             raise SystemExit(f"{VECTORS_PATH} not found. Run build_index.py first.")
-        self.vectors = np.load(VECTORS_PATH)
+        vectors = np.load(VECTORS_PATH)
         with open(META_PATH, encoding="utf-8") as f:
             meta = json.load(f)
-        self.skills = meta["skills"]
+        # The ESCO CSV lists a few skills twice (e.g. 'SQL'). Keep the first row per URI so
+        # search never returns the same skill twice.
+        seen, keep = set(), []
+        for i, s in enumerate(meta["skills"]):
+            if s["uri"] not in seen:
+                seen.add(s["uri"])
+                keep.append(i)
+        self.vectors = vectors[keep]
+        self.skills = [meta["skills"][i] for i in keep]
         self.model_name = meta["model"]
         self._model = None  # loaded on first query
 

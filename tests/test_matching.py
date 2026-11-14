@@ -119,6 +119,26 @@ def test_links_explain_every_job_skill(sim, uris):
     assert js.applicant_skill == "JavaScript Framework" and 0 < js.similarity < 1
 
 
+def test_explain_marks_only_identical_skills_as_exact(sim, uris):
+    """'handle complaints' ~ 'handle customer complaints' reaches similarity 1 after calibration,
+    but it is a different skill and must be shown with its own name."""
+    from matching import explain
+    r = match(uris({"handle customer complaints": 10}), uris({"handle complaints": 10}), sim)
+    assert r.links[0].similarity == 1
+    line = explain(r)[1]
+    assert line.startswith("  ~") and "handle complaints (applicant: 10" in line
+    exact = explain(match(uris({"JavaScript": 10}), uris({"JavaScript": 10}), sim))[1]
+    assert exact.startswith("  +")
+
+
+def test_index_has_each_skill_once(sim):
+    from search import SkillIndex
+    index = SkillIndex()
+    assert len({s["uri"] for s in index.skills}) == len(index.skills) == len(index.vectors)
+    labels = [h["label"] for h in index.search("SQL", k=5)]
+    assert labels.count("SQL") == 1
+
+
 def test_missing_must_haves(sim, uris):
     r = run(sim, uris, DEMO_APPLICANTS["partial + extra"], must=["debug software", "JavaScript"])
     assert r.missing_must_haves == ["debug software"]
