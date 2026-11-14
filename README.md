@@ -9,6 +9,8 @@ Both sides describe themselves in plain language. The AI turns that text into [E
 - **Applicant:** CV or free text → AI suggests skills → applicant keeps, removes or adds skills → spends 10 points on at most 5 skills → answers one validation question per skill in their own words.
 - **Employer:** job ad or task list → AI asks clarifying questions (up to 2 rounds) → concrete tasks with priorities → ESCO skills → recruiter spends 10 points on the skills that matter most.
 
+**Matching:** both sides spend 10 points, so each profile is a priority distribution over ESCO skills. The score is a *soft cosine* between the two distributions: similar but different ESCO skills count partly (e.g. *troubleshoot* ≈ *debug software*), using calibrated similarities between the precomputed skill embeddings. Next to the score, *coverage* says how many of the employer's 10 points the applicant covers, and every employer skill is explained ("covered by X", "similar to Y", "not covered"). Matching is a fixed formula over skill data, with no LLM.
+
 **AI Act principle:** our AI never evaluates people (EU AI Act, Annex III 4(a), high-risk). It only helps applicants describe themselves and helps employers describe jobs. Points and answers are self-declared. Validation answers are shown to recruiters verbatim and are never sent to an LLM.
 
 ## Components
@@ -35,14 +37,17 @@ text ──► 1. Extract ──► 2. Retrieve ──► 3. Select ──► ES
 | [points.py](points.py) | Point budget rules (10 points) shared by applicants and employers |
 | [applicant.py](applicant.py) | `ApplicantFlow` and `ApplicantProfile`: suggestions, search, validation questions; `make_applicant_profile()` builds the profile from the applicant's choices |
 | [employer.py](employer.py) | `EmployerFlow` and `JobProfile`: clarify, build spec, map skills; `make_job_profile()` builds the job profile from the recruiter's points |
+| [matching.py](matching.py) | Matches jobs and applicants on their points: soft cosine score + coverage, with a per-skill explanation. No LLM |
 | [db.py](db.py) | SQLite storage (`data/app.db`, gitignored) for job profiles and applicant profiles, one row per skill with its points |
+| [api.py](api.py) | FastAPI app: the HTTP API for the frontend, see [Backend API](#backend-api-for-the-frontend) |
+| [tests/](tests/) | `pytest` tests for matching and the API (need the index; no Gemini, the API tests use a stub) |
 | `data/validation_questions.json` | Cache of validation questions, one per skill and language. Same skill → same question for everyone |
 
 Both flows are stateless. Each step takes the data it needs as arguments and returns it, so a web backend can call them one request at a time.
 
 ## Setup
 
-Needs Python 3.14 and [uv](https://docs.astral.sh/uv/).
+Needs Python 3.14 and [uv](https://docs.astral.sh/uv/). Runs on Linux, Windows and Apple Silicon Macs. It does not run on Intel Macs, see [Windows and macOS](#windows-and-macos).
 
 ```bash
 uv venv --python 3.14 .venv
@@ -50,13 +55,41 @@ uv pip install --python .venv/bin/python -r requirements.txt --index-strategy un
 export GEMINI_API_KEY=...
 ```
 
-Download the ESCO CSVs (English) into `esco/`. That folder is gitignored. Then build the index once. It takes about 18 minutes on a laptop CPU and can be resumed if interrupted. Alternatively, ask a teammate for `esco/skills.npy` and `esco/skills_meta.json`.
+Get the ESCO index. The easiest way is to copy `esco/skills.npy` and `esco/skills_meta.json` from a teammate into `esco/`. The files work on every platform. That folder is gitignored. To build the index yourself, download the ESCO CSVs (English) into `esco/` and run the command below. It takes about 18 minutes on a laptop CPU and can be resumed if interrupted.
 
 ```bash
 .venv/bin/python build_index.py
 ```
 
+The first search downloads the embedding model (`intfloat/multilingual-e5-small`) from Hugging Face, so it needs internet once.
+
+### Windows and macOS
+
+| Platform | Works? |
+|---|---|
+| Linux x86_64 | Yes |
+| Windows x86_64 | Yes (CPU build of PyTorch) |
+| Mac with Apple Silicon (M1 or later), macOS 14 or newer | Yes |
+| Mac with an Intel CPU | **No.** PyTorch publishes no Intel Mac wheels for `torch==2.14.1`. Use another machine, or run it in Docker with a Linux image |
+
+These results come from resolving `requirements.txt` with `uv pip compile` for each platform. We haven't installed or run the code on a real Windows or Mac machine yet.
+
+**Windows differences.** Every command in this README uses the macOS/Linux path `.venv/bin/...`. On Windows, use `.venv\Scripts\...` instead. In PowerShell:
+
+```powershell
+uv venv --python 3.14 .venv
+uv pip install --python .venv\Scripts\python.exe -r requirements.txt --index-strategy unsafe-best-match
+$env:GEMINI_API_KEY="..."            # this terminal only; use setx GEMINI_API_KEY "..." to keep it
+.venv\Scripts\python build_index.py
+.venv\Scripts\python employer.py --file job_ad.txt
+.venv\Scripts\uvicorn api:app --reload
+```
+
+On Windows, give `applicant.py` and `employer.py` the text with `--file` or as an argument. Piping it in (`type cv.txt | ... applicant.py`) fails, because after reading the pipe they reopen the keyboard through `/dev/tty`, which Windows doesn't have.
+
 ## Usage (terminal)
+
+On Windows, replace `.venv/bin/python` with `.venv\Scripts\python`.
 
 ```bash
 # Free text → ESCO skills (no point allocation)
@@ -71,6 +104,12 @@ Download the ESCO CSVs (English) into `esco/`. That folder is gitignored. Then b
 # Employer: clarify, map, allocate points, see the job card
 .venv/bin/python employer.py --file job_ad.txt --save
 .venv/bin/python employer.py --file job_ad.txt --no-questions --json
+
+# Matching
+.venv/bin/python matching.py job <job-id>              # applicants for a job, best first, with explanations
+.venv/bin/python matching.py applicant <applicant-id>  # jobs for an applicant
+.venv/bin/python matching.py demo                      # synthetic examples, no database needed
+.venv/bin/python -m pytest tests/
 
 # Database
 .venv/bin/python db.py list          # all jobs and applicants
@@ -88,98 +127,110 @@ SkillMapper().map_text(text, role="applicant")
 
 ## Backend API for the frontend
 
-The Python code is not yet served over HTTP. This section is the plan for wrapping it in a FastAPI app. The frontend developer needs to build the screens and call the endpoints below. The backend developer maps each endpoint to the Python call shown.
+[api.py](api.py) serves everything over HTTP with FastAPI. The frontend calls the endpoints below and builds the screens. Each endpoint is a thin wrapper around the Python call shown, and the request and response bodies reuse the Pydantic models in the modules.
 
-### 1. Add the dependencies
+### Run it
 
-FastAPI and Uvicorn are not in `requirements.txt` yet. Add them, then install:
-
-```
-fastapi
-uvicorn
+```bash
+export GEMINI_API_KEY=...
+.venv/bin/uvicorn api:app --reload          # Windows: .venv\Scripts\uvicorn api:app --reload
 ```
 
-Run the server with `.venv/bin/uvicorn api:app --reload`. The app object lives in `api.py`, which does not exist yet.
+Startup takes a few seconds while it loads the ESCO index and the embedding model. Then open **http://127.0.0.1:8000/docs** to try every endpoint with its exact schema. The server stops at startup with a clear message if `GEMINI_API_KEY` or `esco/skills.npy` is missing.
 
-### 2. Load heavy objects once, at startup
+- **Local only.** The server listens on `127.0.0.1` and has no login, so only your own machine can reach it. Every endpoint is open to anyone who can connect, including the ones that return validation answers. Don't start it with `--host 0.0.0.0`.
+- **One process.** Don't use `--workers`. Each worker would load its own copy of the index and the model, and they would share one SQLite file and one question cache.
 
-Creating a `SkillMapper()` loads the ESCO index (`esco/skills.npy`, `esco/skills_meta.json`). The first search also loads the embedding model. Do this once in a FastAPI `lifespan` handler and store it on `app.state`, not per request.
+### Hosting the frontend on the same machine
 
-```python
-from contextlib import asynccontextmanager
-from fastapi import FastAPI
-from map_skills import SkillMapper
+Both setups below avoid hard-coded hosts: call the API with relative URLs such as `/api/applicant/suggest`, never `http://localhost:8000/...`.
 
-@asynccontextmanager
-async def lifespan(app):
-    app.state.mapper = SkillMapper()        # Gemini client + ESCO index
-    app.state.mapper.index.search("warm up", k=1)  # load the embedding model now
-    yield
+- **Built frontend:** put the build output in `frontend/dist`, or set `FRONTEND_DIR` to another folder. `api.py` serves it at `http://127.0.0.1:8000/` from the same server. This needs no CORS and has one URL to open.
+- **Dev server** (Vite, Next and so on): run it next to the API and proxy `/api` to `http://127.0.0.1:8000`. CORS also allows any `localhost` or `127.0.0.1` origin, so calling the API directly works too.
 
-app = FastAPI(lifespan=lifespan)
-```
+### Endpoints
 
-`SkillMapper()` and `SkillIndex()` call `SystemExit` when `GEMINI_API_KEY` or `esco/skills.npy` is missing. Let the server fail at startup with that message, rather than catching it.
+All paths start with `/api`. Every flow call blocks for seconds (Gemini, CPU embeddings), so show a loading state.
 
-### 3. Use `def`, not `async def`, for endpoints that call the flows
-
-Every flow call is blocking: Gemini requests take seconds and the embedding model runs on the CPU. Declare these endpoints with plain `def` so FastAPI runs them in a worker thread. Otherwise, the server freezes while one request waits.
-
-### 4. Endpoints
-
-The request and response bodies are the Pydantic models already in the code. Reuse them so the schema stays in one place. Each route is a thin wrapper.
-
-**Employer** (`employer.py`)
+**Employer**
 
 | Method and path | Body | Calls | Returns |
 |---|---|---|---|
-| `POST /employer/clarify` | `{text, qa: [{question, answer}]}` | `EmployerFlow.clarify(text, qa)` | `Clarification`: `understood_so_far`, `is_clear_enough`, `questions` |
-| `POST /employer/spec` | `{text, qa}` | `EmployerFlow.build_spec(text, qa)` | `JobSpec`: `title`, `summary`, `tasks`, `flags` |
-| `POST /employer/skills` | `{spec}` (the `JobSpec` from the previous step) | `EmployerFlow.map_spec(spec)` | List of skills, each with `uri`, `label`, `priority`, `tasks`, `confidence` |
-| `POST /employer/profile` | `{spec, skills, allocation: {uri: points}}` | `make_job_profile(spec, skills, allocation)` | `JobProfile` (what gets stored and matched) |
+| `POST /api/employer/clarify` | `{text, qa: [{question, answer}]}` | `EmployerFlow.clarify` | `Clarification`: `understood_so_far`, `is_clear_enough`, `questions` |
+| `POST /api/employer/spec` | `{text, qa}` | `EmployerFlow.build_spec` | `JobSpec`: `title`, `summary`, `tasks`, `flags` |
+| `POST /api/employer/skills` | `{spec}` | `EmployerFlow.map_spec` | Skills, must-haves first, each with `uri`, `label`, `priority`, `tasks`, `confidence` |
+| `POST /api/employer/profile` | `{spec, skills, allocation: {uri: points}}` | `make_job_profile` + `db.save_job` | `{id, profile: JobProfile}` |
 
-The flow is stateless, so the frontend sends back what it received. For example, `spec` from `/employer/spec` goes to `/employer/skills`, and then `spec` and `skills` both go to `/employer/profile` with the recruiter's allocation.
+The flow is stateless, so the frontend sends back what it received. `spec` from `/employer/spec` goes to `/employer/skills`. Then `spec` and `skills` both go to `/employer/profile` with the recruiter's allocation.
 
-Clarification runs in rounds. Use `clarify` first. If `is_clear_enough` is false, show `questions` and collect answers. Call `clarify` again with the answers in `qa`. Stop after 2 rounds (`MAX_ROUNDS`), then call `build_spec`.
+Clarification runs in rounds. Call `clarify` first. If `is_clear_enough` is false, show `questions` (each has `why` and `example_answers` to help the employer), and call `clarify` again with all answers so far in `qa`. Stop after 2 rounds, or when `is_clear_enough` is true, then call `spec`.
 
-**Applicant** (`applicant.py`)
+**Applicant**
 
 | Method and path | Body | Calls | Returns |
 |---|---|---|---|
-| `POST /applicant/suggest` | `{text}` | `ApplicantFlow.suggest_skills(text)` | List of AI suggestions, each with `uri`, `label`, `evidence` |
-| `GET /applicant/search?q=...&k=5` | — | `ApplicantFlow.search_skills(q, k)` | Skills matching the query, each with `uri`, `label`, `description`, `score` |
-| `POST /applicant/questions` | `{skills: [{uri}]}` | `ApplicantFlow.questions_for(skills, language)` | `{uri: question}` |
-| `POST /applicant/profile` | `{skills, allocation: {uri: points}, questions: {uri: question}, answers: {uri: answer}}` | `make_applicant_profile(skills, allocation, questions, answers)` | `ApplicantProfile` (what gets stored and matched) |
+| `POST /api/applicant/suggest` | `{text}` | `ApplicantFlow.suggest_skills` | AI suggestions, each with `uri`, `label`, `skillType`, `evidence` (quotes from the text) |
+| `GET /api/applicant/search?q=...&k=5` | — | `ApplicantFlow.search_skills` | Matching skills, each with `uri`, `label`, `skillType`, `description`, `score`. No Gemini |
+| `POST /api/applicant/questions` | `{skills: [{uri}], language: "English"}` | `ApplicantFlow.questions_for` | `{uri: question}` |
+| `POST /api/applicant/profile` | `{skills, allocation: {uri: points}, questions: {uri: question}, answers: {uri: answer}}` | `make_applicant_profile` + `db.save_applicant` | `{id, profile: ApplicantProfile}` |
 
-`skills` is the list of confirmed skills, each with `uri`, `label`, `skillType` and `origin` (`"suggested"` or `"added"`). The applicant sees their suggestions and confirms them before any points are spent, so only confirmed skills are sent. This mirrors `/employer/profile`: the frontend sends back what it received, plus the person's decisions.
+`skills` lists the confirmed skills, each with `uri`, `label`, `skillType` and `origin` (`"suggested"` for a kept AI suggestion, `"added"` for one found with search). The applicant confirms suggestions before spending points, so only confirmed skills are sent.
 
-### 5. Rules the frontend must follow
+**Stored profiles and matching**
 
-These rules are enforced by the backend. The UI should also respect them, so people see the problem before they submit.
+| Method and path | Returns |
+|---|---|
+| `GET /api/jobs` | All jobs: `id`, `created_at`, `title`, `n_skills` |
+| `GET /api/jobs/{id}` | `JobProfile` |
+| `GET /api/jobs/{id}/matches` | Applicants for this job, best first: list of `MatchResult` |
+| `DELETE /api/jobs/{id}` | 204 |
+| `GET /api/applicants` | All applicants: `id`, `created_at`, `n_skills`, `skills` (labels) |
+| `GET /api/applicants/{id}` | `ApplicantProfile`, including the validation answers |
+| `GET /api/applicants/{id}/matches` | Jobs for this applicant, best first: list of `MatchResult` |
+| `DELETE /api/applicants/{id}` | 204 |
+| `GET /api/health` | `{status, esco_skills}` |
+
+A `MatchResult` has these fields:
+- `score` (0–1).
+- `coverage` (0–1): the share of the employer's points the applicant covers.
+- `links`: one per employer skill, with the applicant skill that covers it, both sides' points, and `similarity`, where 1 means the same skill and 0 means not covered.
+- `missing_must_haves`.
+
+Show `links` to explain each match. `explain(result)` in [matching.py](matching.py) shows the wording.
+
+### Errors
+
+| Status | When | `detail` |
+|---|---|---|
+| 422 | A point rule is broken, the text is empty, or a URI is not in the ESCO index | A readable message, e.g. `spend exactly 10 points (got 9)`. Show it to the person |
+| 404 | No job or applicant with that id | `no job with id ...` |
+| 502 | The Gemini request failed | `Gemini request failed: ...`. Let the person retry |
+
+### Rules the frontend must follow
+
+The backend enforces these rules. The UI should also respect them, so people see a problem before they submit.
 
 - **Points:** every allocation adds up to exactly **10** (`POINT_BUDGET`). Each chosen skill gets at least 1 point. Skills with 0 points are dropped.
 - **Applicant limit:** at most **5** skills (`MAX_SKILLS`). Employers have no skill limit.
 - **Uniqueness:** each skill URI appears once.
-- **Validation errors:** rule violations raise `ValueError`. Return them as HTTP 422 with the message, so the frontend can show it.
-- **Never send validation answers to an AI endpoint.** Answers go only to `/applicant/profile` and on to recruiters. Do not add an endpoint that sends answers to Gemini or any other LLM.
+- **Never send validation answers to an AI endpoint.** Answers go only to `/api/applicant/profile` and on to recruiters. Do not add an endpoint that sends answers to Gemini or any other LLM.
 - **AI suggestions are not decisions.** Show them as suggestions. The applicant or recruiter confirms each one.
 - **No personal details.** Profiles have no name, photo, age or nationality. Don't add those fields in the UI.
 
-### 6. Things that will surprise you
+### Good to know
 
-- **First calls are slow.** The first search loads the embedding model. The first `questions_for` call for an unseen skill calls Gemini. Warm up at startup, as in step 2, and show a loading state for the rest.
-- **The question cache is a file.** `validation_questions()` writes `data/validation_questions.json`. Two concurrent first requests for the same new skill can overwrite each other. Losing a cached question is harmless, since it is regenerated later, but avoid running several servers against the same folder.
-- **Terminal-only steps.** `allocate_in_terminal`, `ask_in_terminal`, and `allocate_job_points` are for the CLI. The web version replaces them with UI forms that send `allocation` or `answers`. Do not call them from the API.
-- **Storage is SQLite** ([db.py](db.py)), one file at `data/app.db` with no server. In the profile endpoints, call `db.save_job(conn, job)` or `db.save_applicant(conn, profile)` and return the id along with the profile. Open one connection per request with `db.connect()`, because SQLite connections can't be shared between threads. `db.get_job`, `db.get_applicant`, `db.list_jobs` and `db.list_applicants` cover the read endpoints. For matching, `db.job_points(conn, job_id)` and `db.applicant_points(conn, uris)` return `{uri: points}`. Run a single server process. Validation answers can contain personal details, so delete the database after the event.
-- **CORS.** The frontend runs on a different origin during development. Enable `CORSMiddleware` for that origin.
+- **First calls for new skills are slow.** The first `questions` call for a skill nobody has chosen before asks Gemini. After that, the question comes from `data/validation_questions.json`. Writes to that file are serialised inside the server.
+- **Storage is one SQLite file**, `data/app.db`, created on first use. `db.py list` and `db.py show <id>` read it from the terminal while the server runs. Validation answers can contain personal details, so delete the file after the event.
+- **Terminal-only helpers.** `allocate_in_terminal`, `ask_in_terminal` and `allocate_job_points` are for the CLI. The web version replaces them with forms that send `allocation` and `answers`.
 
-### 7. Quick test
+### Quick test
 
-Once the server runs, check the API from the terminal before building the screens:
+With the server running:
 
 ```bash
-curl -X POST localhost:8000/applicant/suggest -H 'content-type: application/json' \
+curl -X POST 127.0.0.1:8000/api/applicant/suggest -H 'content-type: application/json' \
   -d '{"text": "I kept the books for my family shop and trained 3 new staff"}'
+curl '127.0.0.1:8000/api/applicant/search?q=bookkeeping&k=3'
 ```
 
-FastAPI serves interactive docs at `http://localhost:8000/docs`. Use them to try each endpoint with the exact schema.
+`.venv/bin/python -m pytest tests/` runs the API tests without Gemini. They use a stub for the Gemini calls and a temporary database.
