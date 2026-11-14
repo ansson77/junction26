@@ -717,3 +717,14 @@ button.sl-row:hover { background: var(--surface-2); }
   .stats > div { padding: 0.5rem 0.6rem; }
   .stat-num { font-size: 1.2rem; }
 }
+
+.job-desc { margin-top: 0.75rem; }
+.job-summary { font-size: 1.05rem; max-width: 52rem; }
+.job-desc-cols { display: grid; grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); gap: 1.5rem; align-items: start; }
+.job-desc-cols > div:only-child { grid-column: 1 / -1; }
+.job-desc-cols h3 { margin-top: 0.5rem; }
+.job-desc-cols .flags { margin: 0; }
+.job-desc-foot { display: flex; justify-content: flex-end; margin-top: 1rem; }
+@media (max-width: 860px) {
+  .job-desc-cols { grid-template-columns: 1fr; }
+}

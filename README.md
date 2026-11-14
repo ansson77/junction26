@@ -164,7 +164,7 @@ cd frontend && npx tsc --noEmit         # frontend type check
 | "Gemini request failed: ..." on the page | Gemini was busy or the key is wrong. Click **Try again**. |
 | Address already in use on port 8000 | Another uvicorn is still running. Stop it, or find it with `lsof -i :8000`. |
 | `npm run dev` fails with a syntax error | Node is too old. Check `node --version` is 18 or newer. |
-| Jobs and Applicants pages are empty | No data yet. Create profiles in the site, or load the demo data (step 5). |
+| Shortlist and Applicants pages are empty | No data yet. Create profiles in the site, or load the demo data (step 5). |
 | Changes don't show at http://127.0.0.1:8000 | That is the built frontend. Run `npm run build` again, or use the dev server. |
 
 ### Windows and macOS
@@ -252,7 +252,7 @@ Both setups below avoid hard-coded hosts: call the API with relative URLs such a
 A React + TypeScript app built with Vite. It has these screens:
 - the applicant flow
 - the employer flow
-- the job list, and a job page with applicants ranked best first
+- the shortlist (`/#/shortlist`): pick a job to see its description and the applicants ordered by a 0–100 match score
 - the applicant list, and an applicant page with matching jobs (the applicant's feedback view)
 - business development (`/#/bizdev`, the [bizdev/](bizdev/PLAN.md) module): company → A/B diagnosis → ideas → confirmed tasks → ESCO skills. The result can be downloaded as JSON, or ranked with points and saved as a job so matching finds people for the work
 

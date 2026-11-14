@@ -149,7 +149,7 @@ function JobMatch({ result, title, defaultOpen }: { result: MatchResult; title: 
               of the employer's {POINT_BUDGET} points.
             </p>
           )}
-          <Link className="small" to={`/jobs/${encodeURIComponent(result.job_id ?? "")}`}>
+          <Link className="small" to={`/shortlist/${encodeURIComponent(result.job_id ?? "")}`}>
             View job →
           </Link>
         </div>

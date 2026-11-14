@@ -2,8 +2,8 @@ import { useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { api, formatDate, POINT_BUDGET, type MatchResult } from "../api";
 import MatchLinks from "../components/MatchLinks";
-import { ErrorBox, PriorityBadge, Spinner, useLoad } from "../components/ui";
-import { ApplicantAnswers } from "./Jobs";
+import { ErrorBox, PriorityBadge, Spinner, useAction, useLoad } from "../components/ui";
+import ApplicantAnswers from "../components/ApplicantAnswers";
 
 /** Match score 0-100: the soft-cosine score from matching.py, as a whole number. */
 const scoreOf = (m: MatchResult) => Math.round(m.score * 100);
@@ -58,6 +58,13 @@ function JobShortlist({ id }: { id: string }) {
   const [hideZero, setHideZero] = useState(true);
   const [mustHavesOnly, setMustHavesOnly] = useState(false);
   const [open, setOpen] = useState<string | null>(null);
+  const del = useAction();
+
+  const remove = async () => {
+    if (!confirm("Delete this job? This can't be undone.")) return;
+    const ok = await del.run(() => api.jobs.remove(id).then(() => true));
+    if (ok) nav("/shortlist");
+  };
 
   const mustHaveCount = job.data?.skills.filter((s) => s.priority === "must_have").length ?? 0;
   const skillsOf = useMemo(
@@ -87,6 +94,42 @@ function JobShortlist({ id }: { id: string }) {
       </div>
 
       <ErrorBox error={job.error} onRetry={job.reload} />
+
+      {job.data && (
+        <section className="card job-desc">
+          <p className="job-summary">{job.data.summary}</p>
+          <div className="job-desc-cols">
+            <div>
+              <h3>Tasks</h3>
+              <ul className="plain">
+                {job.data.tasks.map((t, i) => (
+                  <li key={i}>
+                    {t.task} <PriorityBadge priority={t.priority} />
+                  </li>
+                ))}
+              </ul>
+            </div>
+            {job.data.flags.length > 0 && (
+              <div className="flags">
+                <h3>Worth reconsidering</h3>
+                <ul>
+                  {job.data.flags.map((f, i) => (
+                    <li key={i}>
+                      <strong>{f.requirement}</strong> — {f.concern}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </div>
+          <ErrorBox error={del.error} />
+          <div className="job-desc-foot">
+            <button className="btn danger small" onClick={remove} disabled={del.busy}>
+              Delete job
+            </button>
+          </div>
+        </section>
+      )}
 
       {job.data && (
         <div className="job-skills-strip">
