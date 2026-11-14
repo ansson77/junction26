@@ -12,7 +12,7 @@ import argparse
 import db
 
 # Parents before children (foreign keys).
-TABLES = ["jobs", "job_skills", "applicants", "applicant_skills", "invites"]
+TABLES = ["jobs", "job_skills", "applicants", "applicant_skills", "applicant_languages", "invites"]
 
 
 def main():

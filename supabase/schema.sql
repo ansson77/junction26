@@ -42,6 +42,14 @@ CREATE TABLE IF NOT EXISTS applicant_skills (
 );
 CREATE INDEX IF NOT EXISTS applicant_skills_uri ON applicant_skills(uri);
 
+-- Languages the applicant speaks (self-declared, outside the point budget). Employers filter on them.
+CREATE TABLE IF NOT EXISTS applicant_languages (
+    applicant_id  TEXT NOT NULL REFERENCES applicants(id) ON DELETE CASCADE,
+    language      TEXT NOT NULL,
+    position      INTEGER NOT NULL,   -- order the applicant listed them in
+    PRIMARY KEY (applicant_id, language)
+);
+
 -- Applicants a company has invited to the event's networking session, per job.
 -- A recruiter's decision; replacing or deleting the job or the applicant removes it.
 CREATE TABLE IF NOT EXISTS invites (
@@ -64,5 +72,6 @@ ALTER TABLE jobs ENABLE ROW LEVEL SECURITY;
 ALTER TABLE job_skills ENABLE ROW LEVEL SECURITY;
 ALTER TABLE applicants ENABLE ROW LEVEL SECURITY;
 ALTER TABLE applicant_skills ENABLE ROW LEVEL SECURITY;
+ALTER TABLE applicant_languages ENABLE ROW LEVEL SECURITY;
 ALTER TABLE invites ENABLE ROW LEVEL SECURITY;
 ALTER TABLE validation_questions ENABLE ROW LEVEL SECURITY;

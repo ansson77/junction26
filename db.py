@@ -79,6 +79,14 @@ CREATE TABLE IF NOT EXISTS applicant_skills (
 );
 CREATE INDEX IF NOT EXISTS applicant_skills_uri ON applicant_skills(uri);
 
+-- Languages the applicant speaks (self-declared, outside the point budget). Employers filter on them.
+CREATE TABLE IF NOT EXISTS applicant_languages (
+    applicant_id  TEXT NOT NULL REFERENCES applicants(id) ON DELETE CASCADE,
+    language      TEXT NOT NULL,
+    position      INTEGER NOT NULL,   -- order the applicant listed them in
+    PRIMARY KEY (applicant_id, language)
+);
+
 -- Applicants a company has invited to the event's networking session, per job.
 -- A recruiter's decision; replacing or deleting the job or the applicant removes it.
 CREATE TABLE IF NOT EXISTS invites (
@@ -149,8 +157,8 @@ def _pg_pool():
                 conn.execute(SCHEMA)
                 # RLS on with no policies: Supabase's public REST API (anon key) can't touch these
                 # tables. This backend connects as the postgres role, which bypasses RLS.
-                for table in ("jobs", "job_skills", "applicants", "applicant_skills", "invites",
-                              "validation_questions"):
+                for table in ("jobs", "job_skills", "applicants", "applicant_skills", "applicant_languages",
+                              "invites", "validation_questions"):
                     conn.execute(f"ALTER TABLE {table} ENABLE ROW LEVEL SECURITY")
     return _pool
 
@@ -275,6 +283,10 @@ def save_applicant(conn, profile, applicant_id=None):
             [(applicant_id, s.uri, s.label, s.skillType, s.origin, s.points, s.validation_question, s.validation_answer)
              for s in profile.skills],
         )
+        conn.executemany(
+            "INSERT INTO applicant_languages (applicant_id, language, position) VALUES (?, ?, ?)",
+            [(applicant_id, lang, i) for i, lang in enumerate(profile.languages)],
+        )
     return applicant_id
 
 
@@ -287,7 +299,9 @@ def get_applicant(conn, applicant_id):
     skills = conn.execute(
         "SELECT * FROM applicant_skills WHERE applicant_id = ? ORDER BY points DESC, label", (applicant_id,)
     ).fetchall()
-    return ApplicantProfile(skills=[
+    languages = [r["language"] for r in conn.execute(
+        "SELECT language FROM applicant_languages WHERE applicant_id = ? ORDER BY position", (applicant_id,))]
+    return ApplicantProfile(languages=languages, skills=[
         {"uri": s["uri"], "label": s["label"], "skillType": s["skill_type"], "origin": s["origin"],
          "points": s["points"], "validation_question": s["validation_question"],
          "validation_answer": s["validation_answer"]}
@@ -296,11 +310,17 @@ def get_applicant(conn, applicant_id):
 
 
 def list_applicants(conn):
-    return [dict(r) for r in conn.execute(
+    rows = [dict(r) for r in conn.execute(
         f"SELECT a.id, a.created_at, COUNT(s.uri) AS n_skills, {_concat(conn)}(s.label, ', ') AS skills "
         "FROM applicants a LEFT JOIN applicant_skills s ON s.applicant_id = a.id "
         "GROUP BY a.id ORDER BY a.created_at DESC"
     )]
+    languages = {}
+    for r in conn.execute("SELECT applicant_id, language FROM applicant_languages ORDER BY applicant_id, position"):
+        languages.setdefault(r["applicant_id"], []).append(r["language"])
+    for row in rows:
+        row["languages"] = languages.get(row["id"], [])
+    return rows
 
 
 def delete_applicant(conn, applicant_id):

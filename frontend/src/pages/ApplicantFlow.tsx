@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import {
   api,
   allocationProblem,
+  COMMON_LANGUAGES,
   MAX_APPLICANT_SKILLS,
   nonZero,
   POINT_BUDGET,
@@ -12,6 +13,7 @@ import {
   type SearchHit,
   type Suggestion,
 } from "../api";
+import LanguagePicker from "../components/LanguagePicker";
 import PointAllocator from "../components/PointAllocator";
 import { Badge, ErrorBox, PointsBar, Spinner, Steps, useAction } from "../components/ui";
 
@@ -30,6 +32,7 @@ export default function ApplicantFlow() {
   const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
   const [decisions, setDecisions] = useState<Record<string, Decision>>({});
   const [added, setAdded] = useState<ConfirmedSkill[]>([]);
+  const [spoken, setSpoken] = useState<string[]>([]);
   // Step 3
   const [allocation, setAllocation] = useState<Allocation>({});
   // Step 4
@@ -100,7 +103,7 @@ export default function ApplicantFlow() {
         .filter(([uri]) => uri in questions)
         .map(([uri, a]) => [uri, a.trim()]),
     );
-    const res = await run(() => api.applicant.profile(skills, chosen, questions, trimmed));
+    const res = await run(() => api.applicant.profile(skills, chosen, questions, trimmed, spoken));
     if (!res) return;
     setSaved(res);
     go(4);
@@ -224,6 +227,15 @@ export default function ApplicantFlow() {
             )}
           </section>
 
+          <section className="card">
+            <h2>Languages you speak</h2>
+            <p className="muted">
+              Choose every language you can work in. Languages don't use your skill points — employers can filter by
+              them.
+            </p>
+            <LanguagePicker options={COMMON_LANGUAGES} selected={spoken} onChange={setSpoken} allowOther />
+          </section>
+
           <div className="actions sticky">
             <button className="btn ghost" onClick={() => go(0)}>
               Back
@@ -332,6 +344,11 @@ export default function ApplicantFlow() {
               </li>
             ))}
           </ul>
+          {saved.profile.languages.length > 0 && (
+            <p>
+              <strong>Languages:</strong> {saved.profile.languages.join(", ")}
+            </p>
+          )}
           <div className="actions">
             <Link className="btn" to="/applicant/new">
               New profile

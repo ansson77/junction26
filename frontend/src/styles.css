@@ -764,3 +764,26 @@ blockquote {
 /* Job picker: long job titles must not widen the page on phones. */
 label.inline { max-width: 100%; }
 label.inline select { min-width: 0; max-width: 100%; flex: 0 1 auto; }
+
+/* ---------- Languages ---------- */
+
+.lang-picker { display: flex; flex-direction: column; gap: 0.6rem; }
+.lang-chips { display: flex; flex-wrap: wrap; gap: 0.4rem; }
+.lang-chip {
+  font: inherit;
+  font-size: 0.85rem;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+  border-radius: 999px;
+  padding: 0.2rem 0.75rem;
+  cursor: pointer;
+}
+.lang-chip:hover { border-color: var(--accent); }
+.lang-chip.on { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); font-weight: 500; }
+.lang-chip:focus-visible { outline: 0.125rem solid var(--accent); outline-offset: 0.0625rem; }
+.lang-other { display: flex; gap: 0.5rem; max-width: 24rem; }
+.lang-other input { flex: 1; min-width: 0; }
+.lang-filter { margin: 0 0 1rem; }
+.lang-filter-head { display: flex; align-items: center; gap: 0.75rem; margin-bottom: 0.4rem; }
+.lang-list { display: block; }

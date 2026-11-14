@@ -93,7 +93,7 @@ def make_job(client):
     return r.json()
 
 
-def make_applicant(client, index, labels_points):
+def make_applicant(client, index, labels_points, languages=None):
     skills = [{"uri": uri_of(index, l), "label": l, "skillType": "skill/competence", "origin": "added"}
               for l in labels_points]
     allocation = {s["uri"]: p for s, p in zip(skills, labels_points.values())}
@@ -101,6 +101,7 @@ def make_applicant(client, index, labels_points):
         "skills": skills, "allocation": allocation,
         "questions": {s["uri"]: "Describe one time." for s in skills},
         "answers": {s["uri"]: "I did it once." for s in skills},
+        "languages": languages or [],
     })
     assert r.status_code == 200, r.text
     return r.json()
@@ -155,6 +156,18 @@ def test_applicant_flow(client, index):
     saved = make_applicant(client, index, {"debug software": 6, "JavaScript": 4})
     profile = client.get(f"/api/applicants/{saved['id']}").json()
     assert {x["validation_answer"] for x in profile["skills"]} == {"I did it once."}
+
+
+def test_applicant_languages(client, index):
+    saved = make_applicant(client, index, {"debug software": 6, "JavaScript": 4},
+                           languages=[" Finnish ", "English", "english", "Tigrinya"])
+    assert saved["profile"]["languages"] == ["Finnish", "English", "Tigrinya"]
+    assert client.get(f"/api/applicants/{saved['id']}").json()["languages"] == ["Finnish", "English", "Tigrinya"]
+    row = next(a for a in client.get("/api/applicants").json() if a["id"] == saved["id"])
+    assert row["languages"] == ["Finnish", "English", "Tigrinya"]
+    # Languages are outside the point budget: none is fine too.
+    plain = make_applicant(client, index, {"debug software": 10})
+    assert plain["profile"]["languages"] == []
 
 
 def test_only_top_skills_keep_answers(client, index):

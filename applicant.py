@@ -27,7 +27,7 @@ import sys
 from pathlib import Path
 from typing import Literal
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 from map_skills import SkillMapper
 from points import POINT_BUDGET, allocate_in_terminal, check_allocation, points_bar
@@ -37,6 +37,7 @@ QUESTION_CACHE = ROOT / "data" / "validation_questions.json"
 
 MAX_SKILLS = 5
 VALIDATED_SKILLS = 2  # validation questions only for the skills with the most points
+MAX_LANGUAGES = 20
 
 
 # ---------- Profile (what gets stored and shown to recruiters) ----------
@@ -55,6 +56,13 @@ class SkillClaim(BaseModel):
 class ApplicantProfile(BaseModel):
     # Deliberately no name, photo, age or nationality: recruiters see skills first (blind first contact).
     skills: list[SkillClaim]
+    # Languages the applicant speaks, chosen by them. Separate from the point budget: employers filter on them.
+    languages: list[str] = Field(default_factory=list)
+
+    @field_validator("languages")
+    @classmethod
+    def clean_languages(cls, languages):
+        return normalize_languages(languages)
 
     @model_validator(mode="after")
     def check_budget(self):
@@ -64,6 +72,22 @@ class ApplicantProfile(BaseModel):
         return self
 
 
+def normalize_languages(languages):
+    """Trimmed, de-duplicated (case-insensitive) language names, in the order given."""
+    seen, result = set(), []
+    for lang in languages:
+        lang = " ".join(str(lang).split())
+        if not lang or lang.casefold() in seen:
+            continue
+        if len(lang) > 40:
+            raise ValueError(f"language name too long: {lang[:40]}…")
+        seen.add(lang.casefold())
+        result.append(lang)
+    if len(result) > MAX_LANGUAGES:
+        raise ValueError(f"choose at most {MAX_LANGUAGES} languages")
+    return result
+
+
 def skills_to_validate(allocation):
     """The URIs that get a validation question: the VALIDATED_SKILLS skills with the most points
     (1 if the applicant chose only one skill). Ties go to the skill listed first in `allocation`."""
@@ -71,7 +95,7 @@ def skills_to_validate(allocation):
     return ranked[:VALIDATED_SKILLS]
 
 
-def make_applicant_profile(skills, allocation, questions, answers=None):
+def make_applicant_profile(skills, allocation, questions, answers=None, languages=None):
     """Build the profile from what the applicant decided. Mirror of employer.make_job_profile.
 
     skills:     the confirmed skills, each a dict with uri, label, skillType and
@@ -79,6 +103,7 @@ def make_applicant_profile(skills, allocation, questions, answers=None):
     allocation: {uri: points}. Skills with 0 points are dropped.
     questions:  {uri: validation question}, from ApplicantFlow.questions_for()
     answers:    {uri: the applicant's own words}. Stored verbatim. NEVER sent to an LLM.
+    languages:  language names the applicant speaks (outside the point budget).
 
     Raises ValueError if the allocation breaks the rules (budget, max skills, unknown skill)."""
     answers = answers or {}
@@ -100,7 +125,7 @@ def make_applicant_profile(skills, allocation, questions, answers=None):
         )
         for uri, p in allocation.items() if p > 0
     ]
-    return ApplicantProfile(skills=claims)
+    return ApplicantProfile(skills=claims, languages=languages or [])
 
 
 # ---------- Validation questions (generated from the skill only) ----------

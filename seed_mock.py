@@ -936,7 +936,24 @@ def build_job(job, skills):
         sys.exit(f"{job['id']}: {e}")
 
 
-def build_applicant(applicant_id, claims, skills, questions):
+LANGUAGE_NAMES = ["Finnish", "Swedish", "English", "Russian", "Ukrainian", "Arabic", "Estonian", "Persian",
+                  "Vietnamese", "Chinese", "Spanish", "French", "German"]
+
+
+def mock_languages(note, claims):
+    """Spoken languages for a mock applicant: the ones named in the note (not after "no" or
+    "learning") and in their language skills. Applicants not marked international speak Finnish
+    and English."""
+    import re
+    found = [lang for lang in LANGUAGE_NAMES
+             if re.search(rf"(?<!no )(?<!learning ){lang}", note)
+             or any(lang in label for label, _, _ in claims)]
+    if "international" not in note:
+        found = ["Finnish", "English"] + found
+    return list(dict.fromkeys(found or ["English"]))
+
+
+def build_applicant(applicant_id, claims, skills, questions, languages=()):
     """Built through make_applicant_profile, so only the top-points skills (skills_to_validate)
     keep their question and answer; the other hand-written answers are ignored."""
     confirmed = [{"uri": skills[label]["uri"], "label": label, "skillType": skills[label]["skillType"],
@@ -944,7 +961,7 @@ def build_applicant(applicant_id, claims, skills, questions):
     allocation = {skills[label]["uri"]: points for label, points, _ in claims}
     answers = {skills[label]["uri"]: answer for label, _, answer in claims}
     try:
-        return make_applicant_profile(confirmed, allocation, questions, answers)
+        return make_applicant_profile(confirmed, allocation, questions, answers, list(languages))
     except ValueError as e:
         sys.exit(f"{applicant_id}: {e}")
 
@@ -1014,7 +1031,8 @@ def main():
         questions = {}
     else:
         questions = get_questions([{"uri": u} for u in applicant_uris], meta)
-    applicants = {aid: build_applicant(aid, claims, skills, questions) for aid, _, claims in APPLICANTS}
+    applicants = {aid: build_applicant(aid, claims, skills, questions, mock_languages(note, claims))
+                  for aid, note, claims in APPLICANTS}
     if args.check:
         print(f"OK: {len(jobs)} jobs and {len(applicants)} applicants are valid.")
         return

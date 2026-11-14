@@ -127,6 +127,8 @@ class ApplicantProfileIn(BaseModel):
     questions: dict[str, str] = Field(default_factory=dict, description="{uri: question} from /applicant/questions.")
     # Stored verbatim and shown to recruiters. NEVER sent to an LLM.
     answers: dict[str, str] = Field(default_factory=dict, description="{uri: the applicant's own words}.")
+    languages: list[str] = Field(default_factory=list, description="Languages the applicant speaks. "
+                                                                  "Outside the point budget.")
 
 
 class SavedApplicant(BaseModel):
@@ -146,6 +148,7 @@ class ApplicantRow(BaseModel):
     created_at: str
     n_skills: int
     skills: str | None
+    languages: list[str] = Field(default_factory=list)
 
 
 # ---------- Helpers ----------
@@ -254,7 +257,7 @@ def applicant_profile(body: ApplicantProfileIn, request: Request):
     check_known(request, body.allocation)
     try:
         profile = make_applicant_profile([s.model_dump() for s in body.skills], body.allocation,
-                                         body.questions, body.answers)
+                                         body.questions, body.answers, body.languages)
     except ValueError as e:
         raise rule_error(e)
     with open_db(request) as conn:

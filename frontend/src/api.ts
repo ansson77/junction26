@@ -109,7 +109,15 @@ export interface SkillClaim extends ConfirmedSkill {
 
 export interface ApplicantProfile {
   skills: SkillClaim[];
+  /** Languages the applicant speaks. Outside the point budget; employers can filter on them. */
+  languages: string[];
 }
+
+/** Offered as one-click choices; applicants can type any other language too. */
+export const COMMON_LANGUAGES = [
+  "Finnish", "Swedish", "English", "Russian", "Estonian", "Ukrainian", "Arabic", "Somali",
+  "Persian", "Kurdish", "Chinese", "Vietnamese", "Spanish", "French", "German", "Turkish",
+];
 
 // ---------- Stored profiles and matching ----------
 
@@ -125,6 +133,7 @@ export interface ApplicantRow {
   created_at: string;
   n_skills: number;
   skills: string | null;
+  languages: string[];
 }
 
 export interface SkillLink {
@@ -339,7 +348,15 @@ export const api = {
       allocation: Allocation,
       questions: Record<string, string>,
       answers: Record<string, string>,
-    ) => post<{ id: string; profile: ApplicantProfile }>("/applicant/profile", { skills, allocation, questions, answers }),
+      languages: string[],
+    ) =>
+      post<{ id: string; profile: ApplicantProfile }>("/applicant/profile", {
+        skills,
+        allocation,
+        questions,
+        answers,
+        languages,
+      }),
   },
 
   bizdev: {

@@ -4,6 +4,7 @@ import { api, formatDate, POINT_BUDGET, type MatchResult } from "../api";
 import MatchLinks from "../components/MatchLinks";
 import { ErrorBox, PriorityBadge, Spinner, useAction, useLoad } from "../components/ui";
 import ApplicantAnswers from "../components/ApplicantAnswers";
+import LanguagePicker from "../components/LanguagePicker";
 import { demoName } from "../demoNames";
 
 /** Match score 0-100: the soft-cosine score from matching.py, as a whole number. */
@@ -61,6 +62,8 @@ function JobShortlist({ id }: { id: string }) {
   // Anonymous by default: the employer judges skills first, and chooses to see names.
   const [anonymous, setAnonymous] = useState(true);
   const [open, setOpen] = useState<string | null>(null);
+  // Applicants must speak every selected language.
+  const [langFilter, setLangFilter] = useState<string[]>([]);
   const del = useAction();
 
   // Networking invites, saved on the server per job. Toggled optimistically; reverted if saving fails.
@@ -101,10 +104,35 @@ function JobShortlist({ id }: { id: string }) {
     [applicants.data],
   );
 
+  const langsOf = useMemo(() => {
+    const map: Record<string, Set<string>> = {};
+    for (const a of applicants.data ?? []) map[a.id] = new Set(a.languages.map((l) => l.toLocaleLowerCase()));
+    return map;
+  }, [applicants.data]);
+  const languageNamesOf = useMemo(
+    () => Object.fromEntries((applicants.data ?? []).map((a) => [a.id, a.languages])),
+    [applicants.data],
+  );
+  // Filter options: every language some applicant speaks, most common first.
+  const languageOptions = useMemo(() => {
+    const counts = new Map<string, { name: string; n: number }>();
+    for (const a of applicants.data ?? [])
+      for (const l of a.languages) {
+        const key = l.toLocaleLowerCase();
+        const c = counts.get(key) ?? { name: l, n: 0 };
+        c.n += 1;
+        counts.set(key, c);
+      }
+    return [...counts.values()].sort((a, b) => b.n - a.n || a.name.localeCompare(b.name)).map((c) => c.name);
+  }, [applicants.data]);
+  const speaksAll = (aid: string) =>
+    langFilter.every((l) => langsOf[aid]?.has(l.toLocaleLowerCase()));
+
   const all = matches.data ?? [];
   const rows = all.filter(
     (m) =>
       (!hideZero || m.score > 0) &&
+      speaksAll(m.applicant_id ?? "") &&
       (!mustHavesOnly || m.missing_must_haves.length === 0) &&
       (!invitedOnly || invited.has(m.applicant_id ?? "")),
   );
@@ -216,6 +244,30 @@ function JobShortlist({ id }: { id: string }) {
         </label>
       </div>
 
+      {languageOptions.length > 0 && (
+        <div className="lang-filter">
+          <div className="lang-filter-head small">
+            <strong>Languages</strong>
+            <span className="muted">
+              {langFilter.length === 0
+                ? "any — pick languages the applicant must speak"
+                : `speaks ${langFilter.join(" and ")}`}
+            </span>
+            {langFilter.length > 0 && (
+              <button className="btn small ghost" onClick={() => setLangFilter([])}>
+                Clear
+              </button>
+            )}
+          </div>
+          <LanguagePicker
+            options={languageOptions}
+            selected={langFilter}
+            onChange={setLangFilter}
+            label="Filter applicants by language"
+          />
+        </div>
+      )}
+
       <ErrorBox error={inviteError} />
       <ErrorBox error={invites.error} onRetry={invites.reload} />
       {matches.loading && <Spinner label="Matching applicants…" />}
@@ -267,6 +319,9 @@ function JobShortlist({ id }: { id: string }) {
                     {/* Anonymous: the name line stays, blank, so rows keep the same height. */}
                     <span className="sl-name">{anonymous ? " " : demoName(aid)}</span>
                     <span className="small muted clamp1">{skillsOf[aid]}</span>
+                    {(languageNamesOf[aid]?.length ?? 0) > 0 && (
+                      <span className="small muted clamp1">Speaks {languageNamesOf[aid].join(", ")}</span>
+                    )}
                   </span>
                   <span className="sl-num" role="cell">
                     <strong>{covered}</strong>

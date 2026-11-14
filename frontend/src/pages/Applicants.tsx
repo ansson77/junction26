@@ -8,7 +8,9 @@ export function ApplicantList() {
   const { data, error, loading, reload } = useLoad(() => api.applicants.list(), []);
   const [q, setQ] = useState("");
   const rows = (data ?? []).filter(
-    (a) => !q || a.id.toLowerCase().includes(q.toLowerCase()) || (a.skills ?? "").toLowerCase().includes(q.toLowerCase()),
+    (a) =>
+      !q ||
+      [a.id, a.skills ?? "", a.languages.join(" ")].some((t) => t.toLowerCase().includes(q.toLowerCase())),
   );
   return (
     <div className="page">
@@ -24,7 +26,7 @@ export function ApplicantList() {
           type="search"
           value={q}
           onChange={(e) => setQ(e.target.value)}
-          placeholder="Filter by id or skill"
+          placeholder="Filter by id, skill or language"
           aria-label="Filter applicants"
         />
       )}
@@ -36,7 +38,10 @@ export function ApplicantList() {
           <li key={a.id}>
             <Link to={`/applicants/${encodeURIComponent(a.id)}`} className="row-link">
               <span className="row-title">{a.id}</span>
-              <span className="muted small">{a.skills}</span>
+              <span className="muted small">
+                {a.skills}
+                {a.languages.length > 0 && <span className="lang-list">Speaks {a.languages.join(", ")}</span>}
+              </span>
               <span className="muted small nowrap">{formatDate(a.created_at)}</span>
             </Link>
           </li>
@@ -86,6 +91,12 @@ export function ApplicantDetail() {
               </li>
             ))}
           </ul>
+          {profile.data.languages.length > 0 && (
+            <>
+              <h3>Languages</h3>
+              <p>{profile.data.languages.join(", ")}</p>
+            </>
+          )}
           {profile.data.skills.some((s) => s.validation_question) && (
             <>
               <h3>In their own words</h3>
