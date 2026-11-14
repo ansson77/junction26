@@ -11,8 +11,9 @@ Design rule (EU AI Act, Annex III 4(a)): our AI never evaluates the applicant.
 Flow (PLAN.md, applicant steps 1-4):
   1. suggest_skills(text)        AI suggestions from CV / LinkedIn / free text (map_skills.py)
   2. search_skills(query)        applicant adds skills the AI missed (embedding search)
-  3. ApplicantProfile            applicant picks <= MAX_SKILLS skills and spends POINT_BUDGET points
+  3. allocation {uri: points}    applicant spends POINT_BUDGET points on <= MAX_SKILLS skills (points.py)
   4. validation_questions(...)   one question per chosen skill; the applicant answers in their own words
+  5. make_applicant_profile()    confirmed skills + allocation + questions + answers -> ApplicantProfile
 
 Usage:
     .venv/bin/python applicant.py --file cv.txt --out profile.json
@@ -28,12 +29,12 @@ from typing import Literal
 from pydantic import BaseModel, Field, model_validator
 
 from map_skills import SkillMapper
+from points import POINT_BUDGET, allocate_in_terminal, check_allocation, points_bar
 
 ROOT = Path(__file__).resolve().parent
 QUESTION_CACHE = ROOT / "data" / "validation_questions.json"
 
 MAX_SKILLS = 5
-POINT_BUDGET = 10
 
 
 # ---------- Profile (what gets stored and shown to recruiters) ----------
@@ -55,14 +56,40 @@ class ApplicantProfile(BaseModel):
 
     @model_validator(mode="after")
     def check_budget(self):
-        if not 1 <= len(self.skills) <= MAX_SKILLS:
-            raise ValueError(f"choose between 1 and {MAX_SKILLS} skills (got {len(self.skills)})")
-        total = sum(s.points for s in self.skills)
-        if total != POINT_BUDGET:
-            raise ValueError(f"spend exactly {POINT_BUDGET} points (got {total})")
+        check_allocation([s.points for s in self.skills], POINT_BUDGET, MAX_SKILLS)
         if len({s.uri for s in self.skills}) != len(self.skills):
             raise ValueError("each skill can be chosen only once")
         return self
+
+
+def make_applicant_profile(skills, allocation, questions, answers=None):
+    """Build the profile from what the applicant decided. Mirror of employer.make_job_profile.
+
+    skills:     the confirmed skills, each a dict with uri, label, skillType and
+                origin ("suggested" or "added")
+    allocation: {uri: points}. Skills with 0 points are dropped.
+    questions:  {uri: validation question}, from ApplicantFlow.questions_for()
+    answers:    {uri: the applicant's own words}. Stored verbatim. NEVER sent to an LLM.
+
+    Raises ValueError if the allocation breaks the rules (budget, max skills, unknown skill)."""
+    answers = answers or {}
+    by_uri = {s["uri"]: s for s in skills}
+    unknown = set(allocation) - set(by_uri)
+    if unknown:
+        raise ValueError(f"points given to skills that were not confirmed: {sorted(unknown)}")
+    claims = [
+        SkillClaim(
+            uri=uri,
+            label=by_uri[uri]["label"],
+            skillType=by_uri[uri]["skillType"],
+            origin=by_uri[uri].get("origin", "suggested"),
+            points=p,
+            validation_question=questions.get(uri, ""),
+            validation_answer=answers.get(uri, ""),
+        )
+        for uri, p in allocation.items() if p > 0
+    ]
+    return ApplicantProfile(skills=claims)
 
 
 # ---------- Validation questions (generated from the skill only) ----------
@@ -183,48 +210,28 @@ def run_cli(flow, text, language):
     if not confirmed:
         sys.exit("No skills chosen.")
 
-    # 3. Choose top skills and allocate points
-    chosen = confirmed
-    if len(confirmed) > MAX_SKILLS:
-        print(f"\nChoose your {MAX_SKILLS} strongest skills:")
-        for i, c in enumerate(confirmed, 1):
-            print(f"  {i}. {c['label']}")
-        picked = parse_numbers(ask("> "), len(confirmed))[:MAX_SKILLS]
-        chosen = [confirmed[i] for i in picked] or confirmed[:MAX_SKILLS]
-
-    while True:
-        print(f"\nSpread {POINT_BUDGET} points over your skills (at least 1 each) to show where you are strongest.")
-        points, left = [], POINT_BUDGET
-        for i, c in enumerate(chosen):
-            must_leave = len(chosen) - i - 1
-            raw = ask(f"  {c['label']} ({left} left) > ")
-            p = int(raw) if raw.isdigit() else 1
-            p = max(1, min(p, left - must_leave))
-            if i == len(chosen) - 1:
-                p = left  # last skill gets what is left
-            points.append(p)
-            left -= p
-        if sum(points) == POINT_BUDGET:
-            break
+    # 3. Choose skills by spending points on them
+    allocation = allocate_in_terminal(
+        [c["label"] for c in confirmed], POINT_BUDGET, MAX_SKILLS,
+        intro="Where are you strongest? Put more points on the skills you are best at.",
+    )
+    chosen = [confirmed[i] for i in allocation]
+    points_by_uri = {confirmed[i]["uri"]: p for i, p in allocation.items()}
 
     # 4. Validation questions (skill data only) and the applicant's answers (never sent to an LLM)
     questions = flow.questions_for(chosen, language)
     print("\nOne question per skill. Recruiters read your answers as you write them; no AI evaluates them.\n")
-    claims = []
-    for c, p in zip(chosen, points):
-        q = questions[c["uri"]]
-        print(f"{c['label']}: {q}")
-        answer = ask("  > ")
-        claims.append(SkillClaim(uri=c["uri"], label=c["label"], skillType=c["skillType"], origin=c["origin"],
-                                 points=p, validation_question=q, validation_answer=answer))
-    return ApplicantProfile(skills=claims)
+    answers = {}
+    for c in chosen:
+        print(f"{c['label']}: {questions[c['uri']]}")
+        answers[c["uri"]] = ask("  > ")
+    return make_applicant_profile(confirmed, points_by_uri, questions, answers)
 
 
 def print_recruiter_card(profile):
     print("\n=== Skill card (as recruiters see it) ===")
     for s in sorted(profile.skills, key=lambda s: -s.points):
-        bar = "#" * s.points + "." * (POINT_BUDGET - s.points)
-        print(f"\n{bar}  {s.points:>2}  {s.label}")
+        print(f"\n{points_bar(s.points)}  {s.points:>2}  {s.label}")
         print(f"  Q: {s.validation_question}")
         print(f"  A: {s.validation_answer or '(not answered)'}")
 

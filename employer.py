@@ -9,6 +9,8 @@ Flow (PLAN.md, employer steps 1-3):
                    skill phrases. Flags requirements that may exclude people unnecessarily.
   3. map_spec()    Each skill phrase goes through the same retrieve + Decisions selection
                    as map_skills.py. Every ESCO skill keeps the tasks and priority behind it.
+  4. make_job_profile()  The recruiter spends POINT_BUDGET points on the skills that matter
+                   most (points.py). Skills with 0 points are dropped. -> JobProfile
 
 Each step is stateless, so a web backend can call them one request at a time.
 
@@ -30,9 +32,12 @@ import json
 import sys
 from typing import Literal
 
-from pydantic import BaseModel, Field
+from pathlib import Path
+
+from pydantic import BaseModel, Field, model_validator
 
 from map_skills import SkillMapper, Statement
+from points import POINT_BUDGET, allocate_in_terminal, check_allocation, points_bar
 
 MAX_QUESTIONS_PER_ROUND = 4
 MAX_ROUNDS = 2
@@ -76,6 +81,47 @@ class JobSpec(BaseModel):
     summary: str = Field(description="2-3 sentence summary of the role in English, focused on what the person will do.")
     tasks: list[Task]
     flags: list[Flag] = Field(description="Requirements worth challenging. Empty if none.")
+
+
+# ---------- Job profile (what gets stored and matched; mirror of applicant.ApplicantProfile) ----------
+
+class RequiredSkill(BaseModel):
+    uri: str
+    label: str
+    skillType: str
+    priority: Literal["must_have", "learnable", "nice_to_have"]
+    points: int = Field(ge=1, description="How much this skill matters for the job, from the employer's point budget.")
+    tasks: list[str] = Field(default_factory=list, description="The tasks that need this skill.")
+
+
+class JobProfile(BaseModel):
+    title: str
+    summary: str
+    tasks: list[Task]
+    flags: list[Flag]
+    skills: list[RequiredSkill]
+
+    @model_validator(mode="after")
+    def check_budget(self):
+        check_allocation([s.points for s in self.skills], POINT_BUDGET)
+        if len({s.uri for s in self.skills}) != len(self.skills):
+            raise ValueError("each skill can be chosen only once")
+        return self
+
+
+def make_job_profile(spec, skills, allocation):
+    """spec: JobSpec, skills: map_spec() output, allocation: {uri: points}.
+    Skills with 0 points are dropped. Raises ValueError if the allocation breaks the rules."""
+    by_uri = {s["uri"]: s for s in skills}
+    unknown = set(allocation) - set(by_uri)
+    if unknown:
+        raise ValueError(f"unknown skills: {sorted(unknown)}")
+    required = [
+        RequiredSkill(uri=uri, label=by_uri[uri]["label"], skillType=by_uri[uri]["skillType"],
+                      priority=by_uri[uri]["priority"], points=p, tasks=by_uri[uri]["tasks"])
+        for uri, p in allocation.items() if p > 0
+    ]
+    return JobProfile(title=spec.title, summary=spec.summary, tasks=spec.tasks, flags=spec.flags, skills=required)
 
 
 # ---------- Prompts ----------
@@ -239,10 +285,20 @@ def print_result(spec, skills):
         print("\nRequirements worth challenging:")
         for f in spec.flags:
             print(f"  ! {f.requirement}: {f.concern}")
-    print("\nESCO skills (for the recruiter to rank):")
-    for s in skills:
-        prob = f"p={s['probability']:.2f}" if s.get("probability") is not None else s["confidence"]
-        print(f"  [{s['priority']:<12} {prob}] {s['label']}  ({s['skillType']})")
+def allocate_job_points(skills):
+    """Terminal: the recruiter spends POINT_BUDGET points on the mapped skills. Returns {uri: points}."""
+    lines = [f"[{s['priority']:<12}] {s['label']}  ({s['skillType']})" for s in skills]
+    allocation = allocate_in_terminal(
+        lines, POINT_BUDGET,
+        intro="ESCO skills found for this job. What matters most? Put more points on the most important skills.",
+    )
+    return {skills[i]["uri"]: p for i, p in allocation.items()}
+
+
+def print_job_card(job):
+    print(f"\n=== Job card: {job.title} ===")
+    for s in sorted(job.skills, key=lambda s: -s.points):
+        print(f"{points_bar(s.points)}  {s.points:>2}  {s.label}  [{s.priority}]")
 
 
 def main():
@@ -250,7 +306,8 @@ def main():
     parser.add_argument("text", nargs="?", help="job description or task list (or use --file / stdin)")
     parser.add_argument("--file", help="read the job text from a file")
     parser.add_argument("--no-questions", action="store_true", help="skip clarifying questions")
-    parser.add_argument("--json", action="store_true", help="print raw JSON")
+    parser.add_argument("--json", action="store_true", help="print raw JSON (skips point allocation)")
+    parser.add_argument("--out", help="save the job profile (with points) as JSON")
     args = parser.parse_args()
 
     if args.file:
@@ -270,8 +327,16 @@ def main():
             "spec": spec.model_dump(),
             "skills": skills,
         }, ensure_ascii=False, indent=2))
-    else:
-        print_result(spec, skills)
+        return
+
+    print_result(spec, skills)
+    if not skills:
+        sys.exit("No ESCO skills found, nothing to allocate.")
+    job = make_job_profile(spec, skills, allocate_job_points(skills))
+    print_job_card(job)
+    if args.out:
+        Path(args.out).write_text(job.model_dump_json(indent=2), encoding="utf-8")
+        print(f"\nSaved to {args.out}")
 
 
 if __name__ == "__main__":
