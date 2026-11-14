@@ -5,7 +5,7 @@ Website that matches applicants and employers based on real job
 requirements and applicant self ranked skills.
 
 
-## Emploers side:
+## Employers side:
 
 1. Employer opens the website. They can either enter a job application
 they have ready, or in a freeform way enter tasks they are looking
@@ -30,9 +30,9 @@ suggestions: the applicant confirms, removes or adds every skill.
 3. Applicant must choose a set amount of skills (5), and they get 10
 points to allocate to each one based on their expertise.
 
-4. Each chosen skill gets a validation question ("describe one time
-you used this skill"). The question is generated from the ESCO skill
-only, never from applicant data. The applicant's answer is shown
+4. 1-2 of the most weighted skills gets a validation question ("describe
+one time you used this skill"). The question is generated from the ESCO
+skill only, never from applicant data. The applicant's answer is shown
 verbatim to recruiters and is never passed to an LLM.
 
 **AI Act principle:** our AI never evaluates applicants (Annex III
