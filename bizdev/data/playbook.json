@@ -1,0 +1,117 @@
+{
+  "sectors": {
+    "software": "Software and IT",
+    "professional_services": "Professional services",
+    "manufacturing": "Manufacturing",
+    "construction": "Construction",
+    "retail": "Retail and wholesale",
+    "hospitality": "Hospitality and food service",
+    "health_care": "Health and social care",
+    "general": "Other / general"
+  },
+  "questions": {
+    "start": "capacity_or_demand",
+    "items": {
+      "capacity_or_demand": {
+        "prompt": "Growing companies usually stall for one of two reasons. Which is holding you back more right now?",
+        "a": {"label": "We can't take on more work, because we're at capacity", "next": "capacity"},
+        "b": {"label": "We could do more work, but we don't get enough customers", "next": "demand"}
+      },
+      "capacity": {
+        "prompt": "What limits your capacity most?",
+        "a": {"label": "Too much depends on a few key people and what they know", "root_cause": "key_person_dependency"},
+        "b": {"label": "Work is done by hand or differently every time, so it's slow", "root_cause": "manual_work"}
+      },
+      "demand": {
+        "prompt": "What makes winning new customers hard?",
+        "a": {"label": "Customers don't see clearly what we offer or why to choose us", "root_cause": "unclear_offering"},
+        "b": {"label": "We don't actively sell or market; work comes through existing contacts", "root_cause": "no_sales_process"}
+      }
+    }
+  },
+  "root_causes": {
+    "key_person_dependency": {
+      "name": "Key-person dependency",
+      "keywords": ["key person", "key people", "depends on", "only one", "only few", "know-how", "knowledge", "tacit",
+                   "holiday", "sick", "bottleneck", "wait for", "decisions", "owner does everything",
+                   "avainhenkilö", "osaaminen", "hiljainen tieto", "loma"],
+      "current": "Decisions and know-how sit with a few people.",
+      "target": "Know-how is documented and shared, so work doesn't wait for them.",
+      "ideas": [
+        {"title": "Log what waits for the key people", "why": "Seeing what piles up shows which know-how to share first.", "first_step": "For two weeks, log what waits for the key people."},
+        {"title": "Write down decisions and routines", "why": "Written rules let others decide without asking.", "first_step": "Write down the key people's most common decisions and routines."},
+        {"title": "Pair each key person with a second person", "why": "A second person who can step in removes the single point of failure.", "first_step": "Name a second person for each key person."}
+      ],
+      "tasks": [
+        {"id": "key_person_dependency.1", "task": "Map the tasks and know-how that depend on key people", "priority": "must_have",
+         "skills": ["analyse business processes"]},
+        {"id": "key_person_dependency.2", "task": "Document routines and decision rules", "priority": "must_have",
+         "skills": ["document procedures"]},
+        {"id": "key_person_dependency.3", "task": "Train a second person to handle them", "priority": "learnable",
+         "skills": ["train employees", "delegate activities"]}
+      ]
+    },
+    "manual_work": {
+      "name": "Manual ways of working",
+      "keywords": ["manual", "by hand", "ad hoc", "differently every time", "slow", "redo", "rework", "excel",
+                   "paperwork", "admin", "process", "automate", "automation", "lead time", "käsin", "hidas", "paperityö"],
+      "current": "Work is manual and done differently each time.",
+      "target": "A standard, measured process with automation where it pays off.",
+      "ideas": [
+        {"title": "Find where work waits or gets redone", "why": "Waiting and rework are where the time goes.", "first_step": "Find the steps where work waits or gets redone."},
+        {"title": "Standardize the most common job", "why": "One standard way makes the work faster and easier to hand over.", "first_step": "Standardize the most common job."},
+        {"title": "Automate one repetitive task", "why": "A small automation shows quickly what pays off.", "first_step": "Automate one repetitive task."}
+      ],
+      "tasks": [
+        {"id": "manual_work.1", "task": "Map the workflow and find the bottlenecks", "priority": "must_have",
+         "skills": ["analyse business processes"]},
+        {"id": "manual_work.2", "task": "Standardize and document the main process", "priority": "must_have",
+         "skills": ["optimise processes"]},
+        {"id": "manual_work.3", "task": "Introduce a tool or automation that tracks lead time and quality", "priority": "learnable",
+         "skills": ["use workflow automation tools", "manage change"]}
+      ]
+    },
+    "unclear_offering": {
+      "name": "Unclear offering",
+      "keywords": ["unclear", "explain", "what we offer", "why choose", "tailor-made", "tailored", "custom-made", "customized", "every offer",
+                   "pricing", "price", "package", "competitor", "stand out", "differentiate", "brand",
+                   "tarjoama", "hinnoittelu", "kilpailija"],
+      "current": "Every offer is tailor-made and hard to explain.",
+      "target": "A clear, packaged offering that's easy to buy.",
+      "ideas": [
+        {"title": "Ask your best customers why they chose you", "why": "Their reasons are the core of what sets you apart.", "first_step": "Ask your best customers why they chose you."},
+        {"title": "Package your most common service or product", "why": "A package with a fixed scope and price is easier to buy.", "first_step": "Package your most common service or product."},
+        {"title": "Put the offer on one page", "why": "If it fits on one page, customers can understand it.", "first_step": "Put the offer on one page."}
+      ],
+      "tasks": [
+        {"id": "unclear_offering.1", "task": "Analyse customers and competitors to define what sets you apart", "priority": "must_have",
+         "skills": ["perform market research"]},
+        {"id": "unclear_offering.2", "task": "Package the offering with scope and pricing", "priority": "must_have",
+         "skills": ["develop pricing strategies"]},
+        {"id": "unclear_offering.3", "task": "Create sales materials and website content for it", "priority": "learnable",
+         "skills": ["create sales materials", "write content"]}
+      ]
+    },
+    "no_sales_process": {
+      "name": "No sales process",
+      "keywords": ["referral", "contacts", "network", "word of mouth", "existing customers", "new customers", "sales",
+                   "sell", "marketing", "market", "leads", "pipeline", "crm", "outreach", "prospects",
+                   "suosittelu", "myynti", "markkinointi", "asiakkaat"],
+      "current": "Work comes only through existing contacts.",
+      "target": "A repeatable way to find and win new customers.",
+      "ideas": [
+        {"title": "Describe your ideal customer", "why": "Knowing who to look for makes sales focused.", "first_step": "Describe your ideal customer."},
+        {"title": "Track leads in a simple CRM", "why": "A tracked pipeline shows where deals stall.", "first_step": "Track leads in a simple CRM."},
+        {"title": "Contact ten new prospects a month", "why": "A steady rhythm turns sales into a habit.", "first_step": "Contact ten new prospects a month."}
+      ],
+      "tasks": [
+        {"id": "no_sales_process.1", "task": "Define target customers and segments", "priority": "must_have",
+         "skills": ["perform market research"]},
+        {"id": "no_sales_process.2", "task": "Set up a CRM and a sales pipeline", "priority": "must_have",
+         "skills": ["use CRM software"]},
+        {"id": "no_sales_process.3", "task": "Plan and run the first outreach campaign", "priority": "learnable",
+         "skills": ["plan marketing campaigns", "identify new customers"]}
+      ]
+    }
+  }
+}

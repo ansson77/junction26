@@ -1,0 +1,6 @@
+[
+  {"key": "consulting", "business_id": "1234560-4", "name": "Demo Consulting Oy", "sector_family": "professional_services", "tol_code": "70220", "registered": "2017-03-01"},
+  {"key": "bakery", "business_id": "2345671-3", "name": "Leipomo Esimerkki Oy", "sector_family": "retail", "tol_code": "47240", "registered": "2009-08-15"},
+  {"key": "builders", "business_id": "3456782-2", "name": "Rakennus Demo Oy", "sector_family": "construction", "tol_code": "43320", "registered": "2021-05-20"},
+  {"key": "software", "business_id": "4567893-1", "name": "Koodi Demo Oy", "sector_family": "software", "tol_code": "62010", "registered": "2023-01-10"}
+]
