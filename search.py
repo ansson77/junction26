@@ -16,21 +16,46 @@ not whole CVs. Split long text into statements first (e.g. with an LLM).
 
 import argparse
 import json
+import os
+from pathlib import Path
 
 import numpy as np
 
-from build_index import META_PATH, QUERY_PREFIX, VECTORS_PATH, load_model
+ROOT = Path(__file__).resolve().parent
+DEPLOY_DIR = ROOT / "index"   # committed; built by build_deploy_index.py
 
 SKILL_TYPES = {"skill": "skill/competence", "knowledge": "knowledge"}
 
 
+def default_backend():
+    """SKILL_INDEX=gemini|local. Default: gemini (the committed index/, same as the deployed site).
+    local = the full e5 index in esco/ with sentence-transformers (needs requirements-local.txt)."""
+    return os.environ.get("SKILL_INDEX") or ("gemini" if (DEPLOY_DIR / "search.npy").exists() else "local")
+
+
 class SkillIndex:
-    def __init__(self):
-        if not VECTORS_PATH.exists():
-            raise SystemExit(f"{VECTORS_PATH} not found. Run build_index.py first.")
-        vectors = np.load(VECTORS_PATH)
-        with open(META_PATH, encoding="utf-8") as f:
-            meta = json.load(f)
+    """ESCO skill search. Two vector sets:
+      search_vectors  what queries are compared with (search / retrieval)
+      vectors         multilingual-e5-small vectors, used for skill-to-skill similarity (matching.py)
+    With the local backend both are the e5 vectors from esco/; with the gemini backend the search
+    vectors are Gemini embeddings and the query is embedded through the Gemini API (no PyTorch)."""
+
+    def __init__(self, backend=None):
+        self.backend = backend or default_backend()
+        if self.backend == "gemini":
+            meta = json.loads((DEPLOY_DIR / "skills_meta.json").read_text(encoding="utf-8"))
+            match = np.load(DEPLOY_DIR / "match.npy").astype(np.float32)
+            search = np.load(DEPLOY_DIR / "search.npy").astype(np.float32)
+            self.model_name = meta["search_model"]
+            self._dim = meta["search_dim"]
+        else:
+            from build_index import META_PATH, VECTORS_PATH
+            if not VECTORS_PATH.exists():
+                raise SystemExit(f"{VECTORS_PATH} not found. Run build_index.py first.")
+            match = search = np.load(VECTORS_PATH)
+            with open(META_PATH, encoding="utf-8") as f:
+                meta = json.load(f)
+            self.model_name = meta["model"]
         # The ESCO CSV lists a few skills twice (e.g. 'SQL'). Keep the first row per URI so
         # search never returns the same skill twice.
         seen, keep = set(), []
@@ -38,18 +63,31 @@ class SkillIndex:
             if s["uri"] not in seen:
                 seen.add(s["uri"])
                 keep.append(i)
-        self.vectors = vectors[keep]
+        self.vectors = match[keep]
+        self.search_vectors = self.vectors if search is match else search[keep]
         self.skills = [meta["skills"][i] for i in keep]
-        self.model_name = meta["model"]
         self._model = None  # loaded on first query
 
     @property
     def model(self):
         if self._model is None:
-            self._model = load_model(self.model_name)
+            if self.backend == "gemini":
+                from google import genai
+                self._model = genai.Client()
+            else:
+                from build_index import load_model
+                self._model = load_model(self.model_name)
         return self._model
 
     def embed(self, texts):
+        if self.backend == "gemini":
+            from google.genai import types
+            r = self.model.models.embed_content(
+                model=self.model_name, contents=list(texts),
+                config=types.EmbedContentConfig(task_type="RETRIEVAL_QUERY", output_dimensionality=self._dim))
+            v = np.array([e.values for e in r.embeddings], dtype=np.float32)
+            return v / np.linalg.norm(v, axis=1, keepdims=True)
+        from build_index import QUERY_PREFIX
         return self.model.encode(
             [QUERY_PREFIX + t for t in texts],
             normalize_embeddings=True,
@@ -65,7 +103,9 @@ class SkillIndex:
 
     def search_many(self, texts, k=10, skill_type=None):
         """Batch version of search(): one result list per input text."""
-        scores = self.embed(texts) @ self.vectors.T  # cosine similarity (vectors are normalised)
+        if not texts:
+            return []
+        scores = self.embed(texts) @ self.search_vectors.T  # cosine similarity (vectors are normalised)
         if skill_type:
             wanted = SKILL_TYPES[skill_type]
             mask = np.array([s["skillType"] == wanted for s in self.skills])

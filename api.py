@@ -1,8 +1,8 @@
 """HTTP API (FastAPI) over the applicant, employer, storage and matching code.
 
-Local use only: the server listens on 127.0.0.1 and has no login, so only the machine it runs on
-can reach it. Every endpoint, including the ones that return validation answers, is open to
-anyone who can connect. Do not start it with --host 0.0.0.0.
+There is no login: every endpoint, including the ones that return validation answers, is open
+to anyone who can connect. Locally it listens on 127.0.0.1. The Vercel deployment (see
+DEPLOY.md) is public, so treat its URL as a secret and delete the data after the event.
 
 Run (one process; do not use --workers):
     .venv/bin/uvicorn api:app --reload            # macOS / Linux
@@ -156,8 +156,8 @@ _questions_lock = threading.Lock()
 
 @contextmanager
 def open_db(request):
-    """One SQLite connection per request, opened and closed in the endpoint's own thread
-    (sqlite3 connections can't move between threads)."""
+    """One database connection per request, opened and closed in the endpoint's own thread
+    (sqlite3 connections can't move between threads; Postgres ones come from a pool)."""
     conn = db.connect(request.app.state.db_path)
     try:
         yield conn
@@ -372,7 +372,8 @@ def create_app(mapper=None, sim=None, db_path=None, frontend_dir=FRONTEND_DIR):
         if mapper is None:
             from map_skills import SkillMapper
             m = SkillMapper()                 # exits with a message if GEMINI_API_KEY or the index is missing
-            m.index.search("warm up", k=1)    # load the embedding model now, not on the first request
+            if m.index.backend == "local":
+                m.index.search("warm up", k=1)  # load the embedding model now, not on the first request
         else:
             m = mapper
         app.state.mapper = m
@@ -381,7 +382,7 @@ def create_app(mapper=None, sim=None, db_path=None, frontend_dir=FRONTEND_DIR):
         app.state.bizdev = BizDevAgent(mapper=m)
         app.state.sim = sim or SkillSimilarity(m.index)
         app.state.known_uris = {s["uri"] for s in m.index.skills}
-        app.state.db_path = db_path or db.DB_PATH
+        app.state.db_path = db_path  # None: db.connect() picks Postgres (DATABASE_URL) or data/app.db
         yield
 
     app = FastAPI(title="Junction 2026 skills matching", lifespan=lifespan)

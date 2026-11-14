@@ -68,12 +68,16 @@ From the repo root:
 
 ```bash
 uv venv --python 3.14 .venv
-uv pip install --python .venv/bin/python -r requirements.txt --index-strategy unsafe-best-match
+uv pip install --python .venv/bin/python -r requirements.txt
+# Only for the tests, build_index.py or the local e5 model (SKILL_INDEX=local):
+uv pip install --python .venv/bin/python -r requirements-local.txt --index-strategy unsafe-best-match
 ```
 
-### 3. Get the ESCO index
+The website itself only needs `requirements.txt`. Skill search embeds queries with the Gemini API against the committed `index/` folder, the same way as the deployed site. See [DEPLOY.md](DEPLOY.md) for Vercel + Supabase.
 
-The backend needs `esco/skills.npy` and `esco/skills_meta.json`. The `esco/` folder is gitignored, so pick one way to get them:
+### 3. Get the ESCO index (optional)
+
+Only the tests and `SKILL_INDEX=local` need `esco/skills.npy` and `esco/skills_meta.json`. The `esco/` folder is gitignored, so pick one way to get them:
 
 - **Easiest:** copy both files from a teammate into `esco/`. They work on every platform.
 - **Build them yourself:** download the ESCO CSVs (English) into `esco/`, then run `.venv/bin/python build_index.py`. It takes about 18 minutes on a laptop CPU, and you can resume it if it stops.

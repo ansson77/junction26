@@ -1,6 +1,9 @@
-"""SQLite storage for job profiles (employers) and applicant profiles.
+"""Storage for job profiles (employers) and applicant profiles.
 
-One local file (data/app.db, gitignored), no server. Profiles go in and come out as the
+Two backends with the same functions:
+  - Postgres (Supabase) when the DATABASE_URL environment variable is set: the deployed site.
+    Use Supabase's connection pooler URL (port 6543). Schema: supabase/schema.sql.
+  - SQLite otherwise: one local file (data/app.db, gitignored), no server. Profiles go in and come out as the
 validated Pydantic models (employer.JobProfile, applicant.ApplicantProfile), so the database
 never holds an allocation that breaks the point rules.
 
@@ -24,8 +27,10 @@ can still contain personal details, so delete the database after the event.
 """
 
 import json
+import os
 import sqlite3
 import sys
+import threading
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
@@ -82,12 +87,81 @@ CREATE TABLE IF NOT EXISTS invites (
     created_at    TEXT NOT NULL,
     PRIMARY KEY (job_id, applicant_id)
 );
+
+-- Validation question per ESCO skill and language (key "<uri>|<language>"). Postgres only:
+-- locally applicant.py caches them in data/validation_questions.json.
+CREATE TABLE IF NOT EXISTS validation_questions (
+    key       TEXT PRIMARY KEY,
+    question  TEXT NOT NULL
+);
 """
 
+DATABASE_URL = os.environ.get("DATABASE_URL")
+_pool = None
+_pool_lock = threading.Lock()
 
-def connect(path=DB_PATH):
+
+class PgConnection:
+    """psycopg connection with the small sqlite3 surface db.py uses: execute/executemany with `?`
+    placeholders, dict rows, `with conn:` = one transaction, close() returns it to the pool."""
+    pg = True
+
+    def __init__(self, pool):
+        self._pool = pool
+        self._conn = pool.getconn()
+
+    def execute(self, sql, params=()):
+        return self._conn.execute(sql.replace("?", "%s"), params)
+
+    def executemany(self, sql, rows):
+        with self._conn.cursor() as cur:
+            cur.executemany(sql.replace("?", "%s"), rows)
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, *_):
+        if exc_type is None:
+            self._conn.commit()
+        else:
+            self._conn.rollback()
+
+    def close(self):
+        if self._conn is not None:
+            self._conn.rollback()  # end read-only transactions quietly (writes are committed by `with conn:`)
+            self._pool.putconn(self._conn)
+            self._conn = None
+
+
+def _pg_pool():
+    """One small pool per process (Vercel reuses warm instances), created on first use."""
+    global _pool
+    with _pool_lock:
+        if _pool is None:
+            from psycopg.rows import dict_row
+            from psycopg_pool import ConnectionPool
+            # prepare_threshold=None: Supabase's transaction pooler can't keep prepared statements.
+            _pool = ConnectionPool(DATABASE_URL, min_size=0, max_size=4, open=True,
+                                   kwargs={"row_factory": dict_row, "prepare_threshold": None})
+            import atexit
+            atexit.register(_pool.close)
+            with _pool.connection() as conn:
+                conn.execute(SCHEMA)
+                # RLS on with no policies: Supabase's public REST API (anon key) can't touch these
+                # tables. This backend connects as the postgres role, which bypasses RLS.
+                for table in ("jobs", "job_skills", "applicants", "applicant_skills", "invites",
+                              "validation_questions"):
+                    conn.execute(f"ALTER TABLE {table} ENABLE ROW LEVEL SECURITY")
+    return _pool
+
+
+def connect(path=None):
     """Open (and if needed create) the database. Use one connection per request or thread.
-    As a context manager it commits on success and rolls back on error (it does not close)."""
+    As a context manager it commits on success and rolls back on error (it does not close).
+    An explicit `path` always means SQLite (tests); otherwise Postgres if DATABASE_URL is set."""
+    if path is None and DATABASE_URL:
+        return PgConnection(_pg_pool())
+    path = path or DB_PATH
     Path(path).parent.mkdir(parents=True, exist_ok=True)
     conn = sqlite3.connect(path)
     conn.row_factory = sqlite3.Row
@@ -95,6 +169,29 @@ def connect(path=DB_PATH):
     conn.execute("PRAGMA journal_mode = WAL")  # readers don't block the writer
     conn.executescript(SCHEMA)
     return conn
+
+
+def _concat(conn):
+    return "string_agg" if getattr(conn, "pg", False) else "GROUP_CONCAT"
+
+
+# ---------- Validation question cache (Postgres) ----------
+
+def get_questions(conn, keys):
+    """{key: question} for the keys that are cached."""
+    keys = list(keys)
+    if not keys:
+        return {}
+    marks = ",".join("?" * len(keys))
+    return {r["key"]: r["question"] for r in conn.execute(
+        f"SELECT key, question FROM validation_questions WHERE key IN ({marks})", keys)}
+
+
+def save_questions(conn, questions):
+    """Cache {key: question}. The first question stored for a key wins, so everyone gets the same one."""
+    with conn:
+        conn.executemany("INSERT INTO validation_questions (key, question) VALUES (?, ?) ON CONFLICT DO NOTHING",
+                         list(questions.items()))
 
 
 def _now():
@@ -200,7 +297,7 @@ def get_applicant(conn, applicant_id):
 
 def list_applicants(conn):
     return [dict(r) for r in conn.execute(
-        "SELECT a.id, a.created_at, COUNT(s.uri) AS n_skills, GROUP_CONCAT(s.label, ', ') AS skills "
+        f"SELECT a.id, a.created_at, COUNT(s.uri) AS n_skills, {_concat(conn)}(s.label, ', ') AS skills "
         "FROM applicants a LEFT JOIN applicant_skills s ON s.applicant_id = a.id "
         "GROUP BY a.id ORDER BY a.created_at DESC"
     )]
@@ -232,15 +329,17 @@ def applicant_points(conn, uris=None):
 def list_invites(conn, job_id):
     """Applicant ids invited to networking for this job, in the order they were invited."""
     return [r["applicant_id"] for r in conn.execute(
-        "SELECT applicant_id FROM invites WHERE job_id = ? ORDER BY rowid", (job_id,))]
+        "SELECT applicant_id FROM invites WHERE job_id = ? ORDER BY created_at, applicant_id", (job_id,))]
 
 
 def set_invite(conn, job_id, applicant_id, invited=True):
     """Invite (or un-invite) an applicant for a job. Idempotent. The job and the applicant must exist."""
     with conn:
         if invited:
-            conn.execute("INSERT OR IGNORE INTO invites (job_id, applicant_id, created_at) VALUES (?, ?, ?)",
-                         (job_id, applicant_id, _now()))
+            conn.execute("INSERT INTO invites (job_id, applicant_id, created_at) VALUES (?, ?, ?) "
+                         "ON CONFLICT DO NOTHING",
+                         # microseconds: list_invites orders by this (Postgres has no rowid)
+                         (job_id, applicant_id, datetime.now(timezone.utc).isoformat()))
         else:
             conn.execute("DELETE FROM invites WHERE job_id = ? AND applicant_id = ?", (job_id, applicant_id))
 

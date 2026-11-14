@@ -1,0 +1,26 @@
+# Vercel deployment manifest (see DEPLOY.md). Local setup still uses requirements*.txt;
+# keep these dependencies in sync with requirements.txt.
+[project]
+name = "junction26"
+version = "0.1.0"
+requires-python = ">=3.14"
+dependencies = [
+    "numpy==2.2.6",
+    "google-genai==3.3.0",
+    "pydantic==2.14.3",
+    "fastapi==0.162.7",
+    "uvicorn==0.54.0",
+    "psycopg[binary]==3.3.9",
+    "psycopg-pool==3.3.3",
+]
+
+[tool.vercel]
+entrypoint = "api:app"
+
+[tool.vercel.scripts]
+# api.py serves frontend/dist at / (StaticFiles), so build it before the function is bundled.
+build = "cd frontend && npm ci && npm run build"
+
+[tool.vercel.fastapi.static]
+# Serve frontend/dist from the CDN even though api.py has (local-dev) CORS middleware.
+cdn = true

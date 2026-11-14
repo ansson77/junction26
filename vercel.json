@@ -1,0 +1,10 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "regions": ["eu-west-1"],
+  "functions": {
+    "api.py": {
+      "maxDuration": 300,
+      "excludeFiles": "{esco/**,tests/**,demo/**,frontend/node_modules/**,frontend/src/**,data/*.db*,*.docx,*.md,.venv/**,__pycache__/**}"
+    }
+  }
+}

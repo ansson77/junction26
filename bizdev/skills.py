@@ -28,10 +28,14 @@ def live_unavailable_reason():
     """None if live mapping can run, otherwise a sentence saying what is missing.
     Checked before SkillMapper is built, because SkillMapper exits the process when the key is missing."""
     from build_index import META_PATH, VECTORS_PATH
+    from search import DEPLOY_DIR, default_backend
     missing = []
     if not os.environ.get("GEMINI_API_KEY"):
         missing.append("GEMINI_API_KEY is not set")
-    if not VECTORS_PATH.exists() or not META_PATH.exists():
+    if default_backend() == "gemini":
+        if not (DEPLOY_DIR / "search.npy").exists():
+            missing.append(f"the deploy index is missing ({DEPLOY_DIR}/; run build_deploy_index.py)")
+    elif not VECTORS_PATH.exists() or not META_PATH.exists():
         missing.append(f"the ESCO index is missing ({VECTORS_PATH.parent}/skills.npy and skills_meta.json; "
                        "run build_index.py or copy them from a teammate)")
     return "; ".join(missing) or None

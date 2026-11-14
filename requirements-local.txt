@@ -1,0 +1,12 @@
+# Local extras: the multilingual-e5-small model (build_index.py, SKILL_INDEX=local) and the tests.
+# Setup:  uv pip install --python .venv/bin/python -r requirements-local.txt --index-strategy unsafe-best-match
+
+-r requirements.txt
+
+# CPU-only PyTorch (no CUDA download). Remove this line if you have a GPU.
+--extra-index-url https://download.pytorch.org/whl/cpu
+
+torch==2.14.1
+sentence-transformers==6.3.0
+pytest==9.2.0
+httpx==0.28.1          # for FastAPI's TestClient in tests/

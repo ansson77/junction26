@@ -1,15 +1,14 @@
-# Python 3.14 (google-genai >= 3.2, needed for the Decisions API, does not support 3.10).
-# Setup:  uv venv --python 3.14 .venv && uv pip install --python .venv/bin/python -r requirements.txt --index-strategy unsafe-best-match
+# What the website needs (also what Vercel installs, see pyproject.toml). Python 3.14
+# (google-genai >= 3.2, needed for the Decisions API, does not support 3.10).
+# Setup:  uv venv --python 3.14 .venv && uv pip install --python .venv/bin/python -r requirements.txt
+#
+# Skill search embeds queries with the Gemini API against the committed index/ (no PyTorch).
+# For the local e5 model, build_index.py and the tests, also install requirements-local.txt.
 
-# CPU-only PyTorch (no CUDA download). Remove this line if you have a GPU.
---extra-index-url https://download.pytorch.org/whl/cpu
-
-torch==2.14.1
-sentence-transformers==6.3.0
 numpy==2.2.6
 google-genai==3.3.0
 pydantic==2.14.3
 fastapi==0.162.7
 uvicorn==0.54.0
-pytest==9.2.0
-httpx==0.28.1          # for FastAPI's TestClient in tests/
+psycopg[binary]==3.3.9  # Supabase Postgres when DATABASE_URL is set
+psycopg-pool==3.3.3

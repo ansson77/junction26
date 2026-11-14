@@ -137,19 +137,38 @@ def _load_cache():
 def validation_questions(skills, mapper, language="English"):
     """One question per skill, keyed by URI. Input is ESCO skill data ONLY, so no applicant data
     reaches the LLM. Cached in data/validation_questions.json: same skill -> same question."""
+    import db
+
     cache = _load_cache()
     key = lambda s: f"{language}|{s['uri']}"
+    if db.DATABASE_URL:
+        # Deployed: the committed JSON is read-only; new questions are cached in Postgres instead.
+        conn = db.connect()
+        try:
+            cache.update(db.get_questions(conn, (key(s) for s in skills if key(s) not in cache)))
+        finally:
+            conn.close()
     missing = [s for s in skills if key(s) not in cache]
 
     if missing:
         lines = [f"{i}. {s['label']} ({s['skillType']}): {s.get('description', '')[:300]}"
                  for i, s in enumerate(missing)]
         result = mapper.generate(QUESTION_PROMPT.format(language=language), "\n".join(lines), _Questions)
+        new = {}
         for q in result.questions:
             if 0 <= q.index < len(missing):
-                cache[key(missing[q.index])] = q.question
-        QUESTION_CACHE.parent.mkdir(exist_ok=True)
-        QUESTION_CACHE.write_text(json.dumps(cache, ensure_ascii=False, indent=1), encoding="utf-8")
+                new[key(missing[q.index])] = q.question
+        if db.DATABASE_URL:
+            conn = db.connect()
+            try:
+                db.save_questions(conn, new)
+                cache.update(db.get_questions(conn, new))  # another instance may have stored one first
+            finally:
+                conn.close()
+        else:
+            cache.update(new)
+            QUESTION_CACHE.parent.mkdir(exist_ok=True)
+            QUESTION_CACHE.write_text(json.dumps(cache, ensure_ascii=False, indent=1), encoding="utf-8")
 
     fallback = "Describe one situation where you used this skill: what you did and what came of it."
     return {s["uri"]: cache.get(key(s), fallback) for s in skills}
