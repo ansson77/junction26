@@ -138,12 +138,11 @@ The dev server forwards every `/api/...` request to the backend on `127.0.0.1:80
 ### Every time after the first setup
 
 ```bash
-# terminal 1, repo root
-export GEMINI_API_KEY=...
-.venv/bin/uvicorn api:app --reload
-
-# terminal 2
-cd frontend && npm run dev              # then open http://localhost:5173
+tmux new -s demo
+cd ~/junction26
+export GEMINI_API_KEY=...        # set it inside tmux; a running tmux may not have it
+(cd frontend && npm run build)
+while true; do .venv/bin/uvicorn api:app --host 0.0.0.0 --port 8000; echo "crashed, restarting"; sleep 2; done
 ```
 
 ### Tests

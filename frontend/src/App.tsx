@@ -56,7 +56,7 @@ export default function App() {
         <div className="footer-inner">
           <EspooLogo className="footer-logo" />
           <p className="small">
-            Junction 2026 · Skills from ESCO, © European Union · AI never evaluates people (EU AI Act, Annex III 4(a))
+            Junction 2026 · Skills from ESCO, © European Union · Pöytä
           </p>
         </div>
       </footer>
