@@ -29,9 +29,7 @@ then presented to the recruiter, and they rank them.
 3. Applicant is grilled on some of the skills: what evidence is
 there?
 
-4. Applicant must choose a set amount of skills, and ranks them.
-(this part we are unsure on how to do. Should they have an amount
-of points to allocate over all skills?) 
+4. Applicant must choose a set amount of skills, and they get 10(ish) points to allocate to each one based on their expertise.
 
 5. Employees are shortlisted by their skills, their weighting of them.
 Additional options like visa-eligibility can be added.
