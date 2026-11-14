@@ -35,6 +35,7 @@ text ──► 1. Extract ──► 2. Retrieve ──► 3. Select ──► ES
 | [points.py](points.py) | Point budget rules (10 points) shared by applicants and employers |
 | [applicant.py](applicant.py) | `ApplicantFlow` and `ApplicantProfile`: suggestions, search, validation questions; `make_applicant_profile()` builds the profile from the applicant's choices |
 | [employer.py](employer.py) | `EmployerFlow` and `JobProfile`: clarify, build spec, map skills; `make_job_profile()` builds the job profile from the recruiter's points |
+| [db.py](db.py) | SQLite storage (`data/app.db`, gitignored) for job profiles and applicant profiles, one row per skill with its points |
 | `data/validation_questions.json` | Cache of validation questions, one per skill and language. Same skill → same question for everyone |
 
 Both flows are stateless. Each step takes the data it needs as arguments and returns it, so a web backend can call them one request at a time.
@@ -65,11 +66,16 @@ Download the ESCO CSVs (English) into `esco/`. That folder is gitignored. Then b
 .venv/bin/python search.py                      # interactive search, no Gemini needed
 
 # Applicant: suggest, search, allocate points, answer questions, see the recruiter card
-.venv/bin/python applicant.py --file cv.txt --out profile.json
+.venv/bin/python applicant.py --file cv.txt --out profile.json   # --save stores it in the database
 
 # Employer: clarify, map, allocate points, see the job card
-.venv/bin/python employer.py --file job_ad.txt --out job.json
+.venv/bin/python employer.py --file job_ad.txt --save
 .venv/bin/python employer.py --file job_ad.txt --no-questions --json
+
+# Database
+.venv/bin/python db.py list          # all jobs and applicants
+.venv/bin/python db.py show <id>     # one profile as JSON
+.venv/bin/python db.py delete <id>
 ```
 
 From Python:
@@ -164,7 +170,7 @@ These rules are enforced by the backend. The UI should also respect them, so peo
 - **First calls are slow.** The first search loads the embedding model. The first `questions_for` call for an unseen skill calls Gemini. Warm up at startup, as in step 2, and show a loading state for the rest.
 - **The question cache is a file.** `validation_questions()` writes `data/validation_questions.json`. Two concurrent first requests for the same new skill can overwrite each other. Losing a cached question is harmless, since it is regenerated later, but avoid running several servers against the same folder.
 - **Terminal-only steps.** `allocate_in_terminal`, `ask_in_terminal`, and `allocate_job_points` are for the CLI. The web version replaces them with UI forms that send `allocation` or `answers`. Do not call them from the API.
-- **Persistence is not decided.** The API returns profiles and job profiles as JSON. Nothing in the code stores them yet. Decide where they go (for example a database or a file per profile) before the event.
+- **Storage is SQLite** ([db.py](db.py)), one file at `data/app.db` with no server. In the profile endpoints, call `db.save_job(conn, job)` or `db.save_applicant(conn, profile)` and return the id along with the profile. Open one connection per request with `db.connect()`, because SQLite connections can't be shared between threads. `db.get_job`, `db.get_applicant`, `db.list_jobs` and `db.list_applicants` cover the read endpoints. For matching, `db.job_points(conn, job_id)` and `db.applicant_points(conn, uris)` return `{uri: points}`. Run a single server process. Validation answers can contain personal details, so delete the database after the event.
 - **CORS.** The frontend runs on a different origin during development. Enable `CORSMiddleware` for that origin.
 
 ### 7. Quick test

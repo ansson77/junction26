@@ -6,5 +6,8 @@
  "English|http://data.europa.eu/esco/skill/1973c966-f236-40c9-b2d4-5d71a89019be": "Describe a time you used spreadsheet software to organize information or calculate numbers. What did you build, and what was the result?",
  "English|http://data.europa.eu/esco/skill/5ef0c719-5bcb-49f8-b8eb-824388225333": "Describe a time you wrote a script to automate a task. What was the task, what did you code, and what was the result?",
  "English|http://data.europa.eu/esco/skill/ecc18804-a466-40d9-98b4-fba5cd67dd4b": "Describe a time you recorded or organized financial information. What was the situation, what did you do, and what was the outcome?",
- "English|http://data.europa.eu/esco/skill/9d0d89be-bffa-4393-b6f6-8d05bea49051": "Can you describe a time you used data extraction, transformation, and loading tools to combine information? What did you do, and what was the outcome?"
+ "English|http://data.europa.eu/esco/skill/9d0d89be-bffa-4393-b6f6-8d05bea49051": "Can you describe a time you used data extraction, transformation, and loading tools to combine information? What did you do, and what was the outcome?",
+ "English|http://data.europa.eu/esco/skill/3cd569a2-4f88-4c1e-9995-8dce8c5e51a7": "Describe a time you used JavaScript to build or update something. What did you create, and how did it turn out?",
+ "English|http://data.europa.eu/esco/skill/2522a6ce-3202-4ac8-9f5b-b9cb5a3a83a1": "Can you share an example of a software bug you had to fix? What caused the problem, and how did you resolve it?",
+ "English|http://data.europa.eu/esco/skill/21d2f96d-35f7-4e3f-9745-c533d2dd6e97": "Describe a computer program or script you created. What problem were you trying to solve, and what was the outcome?"
 }

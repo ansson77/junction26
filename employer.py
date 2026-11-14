@@ -308,6 +308,7 @@ def main():
     parser.add_argument("--no-questions", action="store_true", help="skip clarifying questions")
     parser.add_argument("--json", action="store_true", help="print raw JSON (skips point allocation)")
     parser.add_argument("--out", help="save the job profile (with points) as JSON")
+    parser.add_argument("--save", action="store_true", help="store the job profile in the database (data/app.db)")
     args = parser.parse_args()
 
     if args.file:
@@ -337,6 +338,11 @@ def main():
     if args.out:
         Path(args.out).write_text(job.model_dump_json(indent=2), encoding="utf-8")
         print(f"\nSaved to {args.out}")
+    if args.save:
+        import db
+        conn = db.connect()
+        print(f"\nStored in the database as job {db.save_job(conn, job)}")
+        conn.close()
 
 
 if __name__ == "__main__":

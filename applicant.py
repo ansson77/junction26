@@ -242,6 +242,7 @@ def main():
     parser.add_argument("--file", help="read the text from a file")
     parser.add_argument("--language", default="English", help="language of the validation questions")
     parser.add_argument("--out", help="save the profile as JSON")
+    parser.add_argument("--save", action="store_true", help="store the profile in the database (data/app.db)")
     args = parser.parse_args()
 
     if args.file:
@@ -257,6 +258,11 @@ def main():
     if args.out:
         Path(args.out).write_text(profile.model_dump_json(indent=2), encoding="utf-8")
         print(f"\nSaved to {args.out}")
+    if args.save:
+        import db
+        conn = db.connect()
+        print(f"\nStored in the database as applicant {db.save_applicant(conn, profile)}")
+        conn.close()
 
 
 if __name__ == "__main__":
