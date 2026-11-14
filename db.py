@@ -73,6 +73,15 @@ CREATE TABLE IF NOT EXISTS applicant_skills (
     PRIMARY KEY (applicant_id, uri)
 );
 CREATE INDEX IF NOT EXISTS applicant_skills_uri ON applicant_skills(uri);
+
+-- Applicants a company has invited to the event's networking session, per job.
+-- A recruiter's decision; replacing or deleting the job or the applicant removes it.
+CREATE TABLE IF NOT EXISTS invites (
+    job_id        TEXT NOT NULL REFERENCES jobs(id) ON DELETE CASCADE,
+    applicant_id  TEXT NOT NULL REFERENCES applicants(id) ON DELETE CASCADE,
+    created_at    TEXT NOT NULL,
+    PRIMARY KEY (job_id, applicant_id)
+);
 """
 
 
@@ -216,6 +225,24 @@ def applicant_points(conn, uris=None):
     for r in rows:
         result.setdefault(r["applicant_id"], {})[r["uri"]] = r["points"]
     return result
+
+
+# ---------- Networking invites ----------
+
+def list_invites(conn, job_id):
+    """Applicant ids invited to networking for this job, in the order they were invited."""
+    return [r["applicant_id"] for r in conn.execute(
+        "SELECT applicant_id FROM invites WHERE job_id = ? ORDER BY rowid", (job_id,))]
+
+
+def set_invite(conn, job_id, applicant_id, invited=True):
+    """Invite (or un-invite) an applicant for a job. Idempotent. The job and the applicant must exist."""
+    with conn:
+        if invited:
+            conn.execute("INSERT OR IGNORE INTO invites (job_id, applicant_id, created_at) VALUES (?, ?, ?)",
+                         (job_id, applicant_id, _now()))
+        else:
+            conn.execute("DELETE FROM invites WHERE job_id = ? AND applicant_id = ?", (job_id, applicant_id))
 
 
 # ---------- CLI ----------

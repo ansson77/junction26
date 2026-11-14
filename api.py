@@ -297,6 +297,37 @@ def job_matches(job_id: str, request: Request):
         return rank_applicants(conn, job_id, request.app.state.sim)
 
 
+def _check_invite_target(conn, job_id, applicant_id=None):
+    if db.get_job(conn, job_id) is None:
+        raise not_found("job", job_id)
+    if applicant_id is not None and db.get_applicant(conn, applicant_id) is None:
+        raise not_found("applicant", applicant_id)
+
+
+@jobs.get("/{job_id}/invites", response_model=list[str])
+def job_invites(job_id: str, request: Request):
+    """Applicant ids the company invited to the networking session for this job."""
+    with open_db(request) as conn:
+        _check_invite_target(conn, job_id)
+        return db.list_invites(conn, job_id)
+
+
+@jobs.put("/{job_id}/invites/{applicant_id}", status_code=204)
+def invite(job_id: str, applicant_id: str, request: Request):
+    """Invite an applicant to networking for this job. Idempotent."""
+    with open_db(request) as conn:
+        _check_invite_target(conn, job_id, applicant_id)
+        db.set_invite(conn, job_id, applicant_id, True)
+
+
+@jobs.delete("/{job_id}/invites/{applicant_id}", status_code=204)
+def uninvite(job_id: str, applicant_id: str, request: Request):
+    """Withdraw the invite. Idempotent."""
+    with open_db(request) as conn:
+        _check_invite_target(conn, job_id, applicant_id)
+        db.set_invite(conn, job_id, applicant_id, False)
+
+
 applicants = APIRouter(prefix="/applicants", tags=["applicants"])
 
 

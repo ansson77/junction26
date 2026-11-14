@@ -364,6 +364,12 @@ export const api = {
     get: (id: string) => request<JobProfile>(`/jobs/${encodeURIComponent(id)}`),
     matches: (id: string) => request<MatchResult[]>(`/jobs/${encodeURIComponent(id)}/matches`),
     remove: (id: string) => request<void>(`/jobs/${encodeURIComponent(id)}`, { method: "DELETE" }),
+    // Networking invites: applicant ids the company invited for this job.
+    invites: (id: string) => request<string[]>(`/jobs/${encodeURIComponent(id)}/invites`),
+    setInvite: (id: string, applicantId: string, invited: boolean) =>
+      request<void>(`/jobs/${encodeURIComponent(id)}/invites/${encodeURIComponent(applicantId)}`, {
+        method: invited ? "PUT" : "DELETE",
+      }),
   },
 
   applicants: {

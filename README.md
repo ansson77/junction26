@@ -293,6 +293,9 @@ Clarification runs in rounds. Call `clarify` first. If `is_clear_enough` is fals
 | `GET /api/jobs/{id}` | `JobProfile` |
 | `GET /api/jobs/{id}/matches` | Applicants for this job, best first: list of `MatchResult` |
 | `DELETE /api/jobs/{id}` | 204 |
+| `GET /api/jobs/{id}/invites` | Applicant ids invited to the networking session for this job, in invite order |
+| `PUT /api/jobs/{id}/invites/{applicant_id}` | 204. Invites the applicant (again is fine) |
+| `DELETE /api/jobs/{id}/invites/{applicant_id}` | 204. Withdraws the invite (again is fine) |
 | `GET /api/applicants` | All applicants: `id`, `created_at`, `n_skills`, `skills` (labels) |
 | `GET /api/applicants/{id}` | `ApplicantProfile`, including the validation answers |
 | `GET /api/applicants/{id}/matches` | Jobs for this applicant, best first: list of `MatchResult` |

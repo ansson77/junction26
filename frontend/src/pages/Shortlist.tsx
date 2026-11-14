@@ -1,9 +1,10 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { api, formatDate, POINT_BUDGET, type MatchResult } from "../api";
 import MatchLinks from "../components/MatchLinks";
 import { ErrorBox, PriorityBadge, Spinner, useAction, useLoad } from "../components/ui";
 import ApplicantAnswers from "../components/ApplicantAnswers";
+import { demoName } from "../demoNames";
 
 /** Match score 0-100: the soft-cosine score from matching.py, as a whole number. */
 const scoreOf = (m: MatchResult) => Math.round(m.score * 100);
@@ -57,8 +58,36 @@ function JobShortlist({ id }: { id: string }) {
 
   const [hideZero, setHideZero] = useState(true);
   const [mustHavesOnly, setMustHavesOnly] = useState(false);
+  // Anonymous by default: the employer judges skills first, and chooses to see names.
+  const [anonymous, setAnonymous] = useState(true);
   const [open, setOpen] = useState<string | null>(null);
   const del = useAction();
+
+  // Networking invites, saved on the server per job. Toggled optimistically; reverted if saving fails.
+  const invites = useLoad(() => api.jobs.invites(id), [id]);
+  const [invited, setInvited] = useState<Set<string>>(new Set());
+  const [invitedOnly, setInvitedOnly] = useState(false);
+  const [inviteError, setInviteError] = useState<unknown>(null);
+  useEffect(() => setInvited(new Set(invites.data ?? [])), [invites.data]);
+
+  const toggleInvite = async (aid: string) => {
+    const on = !invited.has(aid);
+    const flip = (value: boolean) =>
+      setInvited((prev) => {
+        const next = new Set(prev);
+        if (value) next.add(aid);
+        else next.delete(aid);
+        return next;
+      });
+    flip(on);
+    setInviteError(null);
+    try {
+      await api.jobs.setInvite(id, aid, on);
+    } catch (e) {
+      flip(!on);
+      setInviteError(e);
+    }
+  };
 
   const remove = async () => {
     if (!confirm("Delete this job? This can't be undone.")) return;
@@ -73,7 +102,12 @@ function JobShortlist({ id }: { id: string }) {
   );
 
   const all = matches.data ?? [];
-  const rows = all.filter((m) => (!hideZero || m.score > 0) && (!mustHavesOnly || m.missing_must_haves.length === 0));
+  const rows = all.filter(
+    (m) =>
+      (!hideZero || m.score > 0) &&
+      (!mustHavesOnly || m.missing_must_haves.length === 0) &&
+      (!invitedOnly || invited.has(m.applicant_id ?? "")),
+  );
   const strong = all.filter((m) => scoreOf(m) >= 70).length;
 
   return (
@@ -157,6 +191,10 @@ function JobShortlist({ id }: { id: string }) {
             <div className="stat-num">{all.filter((m) => m.missing_must_haves.length === 0 && m.score > 0).length}</div>
             <div className="small muted">have every must-have</div>
           </div>
+          <div>
+            <div className="stat-num">{invited.size}</div>
+            <div className="small muted">invited to networking</div>
+          </div>
         </div>
       )}
 
@@ -171,8 +209,27 @@ function JobShortlist({ id }: { id: string }) {
             applicants with every must-have
           </label>
         )}
+        <label className="inline small">
+          <input type="checkbox" checked={invitedOnly} onChange={(e) => setInvitedOnly(e.target.checked)} /> Only
+          invited ({invited.size})
+        </label>
+        <label className="switch">
+          <input
+            type="checkbox"
+            role="switch"
+            checked={anonymous}
+            onChange={(e) => setAnonymous(e.target.checked)}
+          />
+          <span className="switch-track" aria-hidden />
+          <span className="small">
+            <strong>Anonymous applications</strong>
+            <span className="muted"> · {anonymous ? "skills only" : "names shown (demo names)"}</span>
+          </span>
+        </label>
       </div>
 
+      <ErrorBox error={inviteError} />
+      <ErrorBox error={invites.error} onRetry={invites.reload} />
       {matches.loading && <Spinner label="Matching applicants…" />}
       <ErrorBox error={matches.error} onRetry={matches.reload} />
 
@@ -187,6 +244,7 @@ function JobShortlist({ id }: { id: string }) {
             <span role="columnheader" className="sl-num">Your points covered</span>
             <span role="columnheader" className="sl-num">Must-haves</span>
             <span role="columnheader">Matched skills</span>
+            <span role="columnheader">Networking</span>
           </div>
           {rows.map((m, i) => {
             const aid = m.applicant_id ?? "";
@@ -196,7 +254,19 @@ function JobShortlist({ id }: { id: string }) {
             const isOpen = open === aid;
             return (
               <div key={aid} className={`sl-item ${isOpen ? "open" : ""}`}>
-                <button className="sl-row" role="row" aria-expanded={isOpen} onClick={() => setOpen(isOpen ? null : aid)}>
+                <div
+                  className="sl-row"
+                  role="row"
+                  tabIndex={0}
+                  aria-expanded={isOpen}
+                  onClick={() => setOpen(isOpen ? null : aid)}
+                  onKeyDown={(e) => {
+                    if (e.target === e.currentTarget && (e.key === "Enter" || e.key === " ")) {
+                      e.preventDefault();
+                      setOpen(isOpen ? null : aid);
+                    }
+                  }}
+                >
                   <span className="sl-rank" role="cell">{i + 1}</span>
                   <span className="sl-score" role="cell">
                     <span className={`score-num ${t.cls}`}>{score}</span>
@@ -206,7 +276,13 @@ function JobShortlist({ id }: { id: string }) {
                     </span>
                   </span>
                   <span className="sl-applicant" role="cell">
-                    <span className="mono">{aid}</span>
+                    {anonymous ? (
+                      <span className="mono">{aid}</span>
+                    ) : (
+                      <span className="sl-name">
+                        {demoName(aid)} <span className="mono muted small">{aid}</span>
+                      </span>
+                    )}
                     <span className="small muted clamp1">{skillsOf[aid]}</span>
                   </span>
                   <span className="sl-num" role="cell">
@@ -233,7 +309,21 @@ function JobShortlist({ id }: { id: string }) {
                         </span>
                       ))}
                   </span>
-                </button>
+                  <span className="sl-invite" role="cell" onClick={(e) => e.stopPropagation()}>
+                    <label className={`switch ${invited.has(aid) ? "on" : ""}`}>
+                      <input
+                        type="checkbox"
+                        role="switch"
+                        checked={invited.has(aid)}
+                        disabled={invites.loading}
+                        onChange={() => toggleInvite(aid)}
+                        aria-label={`Invite ${anonymous ? aid : demoName(aid)} to networking`}
+                      />
+                      <span className="switch-track" aria-hidden />
+                      <span className="small">{invited.has(aid) ? "Invited" : "Invite"}</span>
+                    </label>
+                  </span>
+                </div>
                 {isOpen && (
                   <div className="sl-detail">
                     <MatchLinks result={m} perspective="recruiter" />

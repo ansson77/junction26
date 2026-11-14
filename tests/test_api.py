@@ -202,5 +202,29 @@ def test_matching_and_delete(client, index):
     assert client.get("/api/jobs/does-not-exist/matches").status_code == 404
 
 
+def test_networking_invites(client, index):
+    job = make_job(client)
+    a = make_applicant(client, index, {job["profile"]["skills"][0]["label"]: 10})
+    b = make_applicant(client, index, {"accounting": 10})
+    url = f"/api/jobs/{job['id']}/invites"
+
+    assert client.get(url).json() == []
+    assert client.put(f"{url}/{a['id']}").status_code == 204
+    assert client.put(f"{url}/{a['id']}").status_code == 204          # idempotent
+    assert client.put(f"{url}/{b['id']}").status_code == 204
+    assert client.get(url).json() == [a["id"], b["id"]]
+
+    assert client.delete(f"{url}/{a['id']}").status_code == 204
+    assert client.delete(f"{url}/{a['id']}").status_code == 204       # idempotent
+    assert client.get(url).json() == [b["id"]]
+
+    # Deleting the applicant removes their invite.
+    assert client.delete(f"/api/applicants/{b['id']}").status_code == 204
+    assert client.get(url).json() == []
+
+    assert client.put(f"{url}/does-not-exist").status_code == 404
+    assert client.get("/api/jobs/does-not-exist/invites").status_code == 404
+
+
 def test_health(client):
     assert client.get("/api/health").json()["status"] == "ok"
