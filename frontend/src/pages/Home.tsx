@@ -5,16 +5,18 @@ import { useLoad } from "../components/ui";
 export default function Home() {
   const health = useLoad(() => api.health(), []);
   return (
-    <div className="page">
-      <section className="hero">
+    <>
+    <section className="hero">
+      <div className="hero-inner">
         <h1>Match on what people can actually do.</h1>
         <p className="lead">
           Employers describe the work. Applicants describe their experience. Both spend {POINT_BUDGET} points on the{" "}
           <a href="https://esco.ec.europa.eu/" target="_blank" rel="noreferrer">ESCO</a> skills that matter most — and
           the match is a transparent formula over those points.
         </p>
-      </section>
-
+      </div>
+    </section>
+    <div className="page">
       <div className="choices">
         <Link to="/applicant/new" className="choice card">
           <div className="choice-kicker">I'm looking for work</div>
@@ -29,6 +31,14 @@ export default function Home() {
           <h2>Describe a job</h2>
           <p className="muted">
             Paste a job ad or list the tasks. Answer a few questions, then rank the skills that matter most.
+          </p>
+          <span className="choice-go">Start →</span>
+        </Link>
+        <Link to="/bizdev" className="choice card">
+          <div className="choice-kicker">I run a company</div>
+          <h2>Find what holds growth back</h2>
+          <p className="muted">
+            Answer a few either-or questions, get ideas to fix it, and see which skills the work takes.
           </p>
           <span className="choice-go">Start →</span>
         </Link>
@@ -57,5 +67,6 @@ export default function Home() {
             : `Connected · ${health.data?.esco_skills.toLocaleString()} ESCO skills indexed`}
       </p>
     </div>
+    </>
   );
 }

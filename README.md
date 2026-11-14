@@ -41,6 +41,7 @@ text ──► 1. Extract ──► 2. Retrieve ──► 3. Select ──► ES
 | [db.py](db.py) | SQLite storage (`data/app.db`, gitignored) for job profiles and applicant profiles, one row per skill with its points |
 | [api.py](api.py) | FastAPI app: the HTTP API for the frontend, see [Backend API](#backend-api-for-the-frontend) |
 | [seed_mock.py](seed_mock.py) | Demo data: about 15 jobs and 85 anonymous applicants (ids start with `mock-`) |
+| [bizdev/](bizdev/PLAN.md) | Business development agent: company diagnosis → ideas → tasks → ESCO skills, under `/api/bizdev` |
 | [frontend/](frontend/) | The website (React + Vite), see [The frontend](#the-frontend-in-frontend) |
 | [tests/](tests/) | `pytest` tests for matching and the API (need the index; no Gemini, the API tests use a stub) |
 | `data/validation_questions.json` | Cache of validation questions, one per skill and language. Same skill → same question for everyone |
@@ -99,6 +100,14 @@ To get about 15 jobs and 85 applicants for demos and matching:
 ```
 
 It only touches ids that start with `mock-`, never real profiles. It needs `GEMINI_API_KEY` only if a mock skill has no cached validation question.
+
+For the business development section, map its playbook tasks to ESCO skills once:
+
+```bash
+.venv/bin/python -m bizdev.prepare      # writes bizdev/data/playbook_esco.json; needs GEMINI_API_KEY
+```
+
+Without that file the section still works, but every skills step calls Gemini and takes longer.
 
 ### 6. Start the backend (terminal 1)
 
@@ -245,6 +254,7 @@ A React + TypeScript app built with Vite. It has these screens:
 - the employer flow
 - the job list, and a job page with applicants ranked best first
 - the applicant list, and an applicant page with matching jobs (the applicant's feedback view)
+- business development (`/#/bizdev`, the [bizdev/](bizdev/PLAN.md) module): company → A/B diagnosis → ideas → confirmed tasks → ESCO skills. The result can be downloaded as JSON, or ranked with points and saved as a job so matching finds people for the work
 
 All API calls are in [frontend/src/api.ts](frontend/src/api.ts). How to run it is in [step 7](#7-start-the-frontend-terminal-2). The app uses hash URLs (`/#/jobs/<id>`), so deep links also work from the built version.
 

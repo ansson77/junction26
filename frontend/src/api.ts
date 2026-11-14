@@ -146,6 +146,127 @@ export interface MatchResult {
   applicant_id: string | null;
 }
 
+// ---------- Business developer (bizdev/models.py) ----------
+
+export interface CompanyProfile {
+  business_id: string | null;
+  name: string | null;
+  sector_family: string;
+  tol_code: string | null;
+  registered: string | null;
+  age_band: string | null;
+  source: "prh" | "sample" | "manual";
+}
+
+export interface SampleCompany {
+  key: string;
+  business_id: string;
+  name: string;
+  sector_family: string;
+  tol_code?: string;
+  registered?: string;
+}
+
+export interface BizOptions {
+  samples: SampleCompany[];
+  sectors: Record<string, string>;
+  warnings: string[];
+}
+
+export interface DiagnosisOption {
+  label: string;
+  next: string | null;
+  root_cause: string | null;
+}
+
+export interface Hypothesis {
+  id: string;
+  prompt: string;
+  a: DiagnosisOption;
+  b: DiagnosisOption;
+}
+
+export interface RootCauseChoice {
+  id: string;
+  name: string;
+  current: string;
+}
+
+export interface Diagnosis {
+  sector_family: string;
+  answers: { question_id: string; answer: "A" | "B" | "neither" }[];
+  current_question: Hypothesis | null;
+  needs_text: boolean;
+  needs_choice: boolean;
+  choices: RootCauseChoice[];
+  text: string | null;
+  root_cause: string | null;
+}
+
+export interface Idea {
+  title: string;
+  why: string;
+  first_step: string;
+}
+
+export interface CapabilityShift {
+  root_cause: string;
+  name: string;
+  current: string;
+  target: string;
+  benefit: string | null;
+}
+
+export interface CardTask {
+  id: string;
+  task: string;
+  priority: Priority;
+  origin: "playbook" | "company";
+  skills: string[];
+}
+
+export interface TaskCard {
+  root_cause: string;
+  tasks: CardTask[];
+}
+
+export interface TaskCardEdit {
+  remove?: string[];
+  edit?: Record<string, string>;
+  add?: string[];
+  priority?: Record<string, Priority>;
+}
+
+export interface BizSkill {
+  uri: string;
+  label: string;
+  skillType: string;
+  reuseLevel: string | null;
+  priority: Priority;
+  confidence: "high" | "medium";
+  probability: number | null;
+  tasks: string[];
+  sources: string[];
+}
+
+export interface SkillRequirements {
+  schema: string;
+  created: string;
+  company: { business_id: string | null; name: string | null; sector_family: string };
+  need: { root_cause: string; name: string; current: string; target: string };
+  ideas: Idea[];
+  tasks: {
+    id: string;
+    task: string;
+    priority: Priority;
+    origin: "playbook" | "company";
+    status: "mapped" | "unmapped" | "no_match";
+    skill_phrases: string[];
+  }[];
+  skills: BizSkill[];
+  job_spec: JobSpec;
+}
+
 // ---------- Transport ----------
 
 export class ApiError extends Error {
@@ -219,6 +340,23 @@ export const api = {
       questions: Record<string, string>,
       answers: Record<string, string>,
     ) => post<{ id: string; profile: ApplicantProfile }>("/applicant/profile", { skills, allocation, questions, answers }),
+  },
+
+  bizdev: {
+    options: () => request<BizOptions>("/bizdev/options"),
+    // One of: {business_id} (PRH lookup, 404 if it fails), {sample}, or {sector, name?, business_id?}.
+    profile: (body: { business_id?: string; sample?: string; sector?: string; name?: string }) =>
+      post<CompanyProfile>("/bizdev/profile", body),
+    diagnose: (profile: CompanyProfile) => post<Diagnosis>("/bizdev/diagnose", { profile }),
+    answer: (diagnosis: Diagnosis, answer: "A" | "B" | "neither") =>
+      post<Diagnosis>("/bizdev/answer", { diagnosis, answer }),
+    describe: (diagnosis: Diagnosis, text: string) => post<Diagnosis>("/bizdev/describe", { diagnosis, text }),
+    choose: (diagnosis: Diagnosis, root_cause: string) => post<Diagnosis>("/bizdev/choose", { diagnosis, root_cause }),
+    ideas: (diagnosis: Diagnosis) => post<{ shift: CapabilityShift; ideas: Idea[] }>("/bizdev/ideas", { diagnosis }),
+    taskcard: (diagnosis: Diagnosis) => post<TaskCard>("/bizdev/taskcard", { diagnosis }),
+    edit: (card: TaskCard, changes: TaskCardEdit) => post<TaskCard>("/bizdev/taskcard/edit", { card, ...changes }),
+    skills: (profile: CompanyProfile, diagnosis: Diagnosis, card: TaskCard) =>
+      post<SkillRequirements>("/bizdev/skills", { profile, diagnosis, card }),
   },
 
   jobs: {

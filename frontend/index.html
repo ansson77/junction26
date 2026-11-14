@@ -3,11 +3,38 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 16 16%22%3E%3Cpath d=%22M8 0l8 8-8 8-8-8z%22 fill=%22%231f6feb%22/%3E%3C/svg%3E" />
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 16 16%22%3E%3Crect width=%2216%22 height=%2216%22 rx=%223%22 fill=%22%230050bb%22/%3E%3C/svg%3E" />
+    <meta name="theme-color" content="#0050bb" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Lato:wght@400;700&family=Work+Sans:ital,wght@0,400;0,600;1,400&display=swap" />
     <title>Skill Match Espoo</title>
   </head>
   <body>
     <div id="root"></div>
+    <!-- Plain ES5 on purpose: runs even on browsers that can't run the app, and says why instead of a blank page. -->
+    <script>
+      (function () {
+        var errors = [];
+        function show(reason) {
+          var root = document.getElementById("root");
+          if (!root || root.querySelector("main")) return; // the app is running
+          root.innerHTML =
+            '<div style="font:15px/1.5 system-ui,sans-serif;max-width:40rem;margin:3rem auto;padding:0 1rem">' +
+            "<h1>The app didn't start</h1><p>" + reason + "</p>" +
+            (errors.length ? "<pre style=\"white-space:pre-wrap;background:#f0f2f5;padding:.75rem\">" + errors.join("\n") + "</pre>" : "") +
+            "<p style=\"color:#5d6573\">Browser: " + navigator.userAgent + "</p>" +
+            '<p><button onclick="location.reload()">Reload</button></p></div>';
+        }
+        window.addEventListener("error", function (e) {
+          var t = e.target;
+          errors.push(t && t !== window && (t.src || t.href) ? "Could not load " + (t.src || t.href) : String(e.message));
+        }, true);
+        setTimeout(function () {
+          show(errors.length ? "An error stopped it:" : "This browser may be too old. Try an up-to-date Chrome, Firefox, Safari or Edge.");
+        }, 8000);
+      })();
+    </script>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

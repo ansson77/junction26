@@ -1,0 +1,215 @@
+{
+  "created": "2026-11-14T17:52:33+02:00",
+  "phrases": {
+    "analyse business processes": [
+      {
+        "uri": "http://data.europa.eu/esco/skill/56042303-972b-41be-9310-58467599ff7e",
+        "label": "analyse business processes",
+        "skillType": "skill/competence",
+        "reuseLevel": "cross-sector",
+        "confidence": "high",
+        "probability": 0.924
+      },
+      {
+        "uri": "http://data.europa.eu/esco/skill/9e84a506-df06-4be3-874a-fa01293e3dd5",
+        "label": "business processes",
+        "skillType": "knowledge",
+        "reuseLevel": "cross-sector",
+        "confidence": "high",
+        "probability": 0.824
+      },
+      {
+        "uri": "http://data.europa.eu/esco/skill/633a3637-2c6b-40ae-ac38-289eb2a62aa6",
+        "label": "business analysis",
+        "skillType": "knowledge",
+        "reuseLevel": "cross-sector",
+        "confidence": "medium",
+        "probability": 0.72
+      }
+    ],
+    "document procedures": [
+      {
+        "uri": "http://data.europa.eu/esco/skill/f8bf9a84-d60b-4edc-bfa0-b0ece9bf8954",
+        "label": "create documented procedures",
+        "skillType": "skill/competence",
+        "reuseLevel": "occupation-specific",
+        "confidence": "high",
+        "probability": 0.971
+      }
+    ],
+    "train employees": [
+      {
+        "uri": "http://data.europa.eu/esco/skill/e54ff029-1ce9-447d-a5b2-eb7283a23e6e",
+        "label": "train employees",
+        "skillType": "skill/competence",
+        "reuseLevel": "cross-sector",
+        "confidence": "high",
+        "probability": 0.987
+      },
+      {
+        "uri": "http://data.europa.eu/esco/skill/0cc9c234-f817-4f4c-908a-4d28fe3b0f4a",
+        "label": "coach employees",
+        "skillType": "skill/competence",
+        "reuseLevel": "cross-sector",
+        "confidence": "high",
+        "probability": 0.842
+      }
+    ],
+    "delegate activities": [
+      {
+        "uri": "http://data.europa.eu/esco/skill/b00e948c-19be-4951-8cff-60f88f1046e9",
+        "label": "delegate responsibilities",
+        "skillType": "skill/competence",
+        "reuseLevel": "transversal",
+        "confidence": "high",
+        "probability": 0.982
+      }
+    ],
+    "optimise processes": [
+      {
+        "uri": "http://data.europa.eu/esco/skill/75b30aeb-34c0-40f4-b77d-271d75a98b14",
+        "label": "improve business processes",
+        "skillType": "skill/competence",
+        "reuseLevel": "cross-sector",
+        "confidence": "high",
+        "probability": 0.888
+      }
+    ],
+    "use workflow automation tools": [],
+    "manage change": [
+      {
+        "uri": "http://data.europa.eu/esco/skill/3c03ee71-4a23-448f-b79e-81fd75d27dca",
+        "label": "apply change management",
+        "skillType": "skill/competence",
+        "reuseLevel": "cross-sector",
+        "confidence": "high",
+        "probability": 0.919
+      }
+    ],
+    "perform market research": [
+      {
+        "uri": "http://data.europa.eu/esco/skill/fe39d4db-4cb5-4299-bb9f-896c8fd6ab13",
+        "label": "perform market research",
+        "skillType": "skill/competence",
+        "reuseLevel": "cross-sector",
+        "confidence": "high",
+        "probability": 0.964
+      },
+      {
+        "uri": "http://data.europa.eu/esco/skill/8770350e-746f-4adb-9556-18ca68104be6",
+        "label": "market research",
+        "skillType": "knowledge",
+        "reuseLevel": "cross-sector",
+        "confidence": "high",
+        "probability": 0.952
+      },
+      {
+        "uri": "http://data.europa.eu/esco/skill/b011c8b4-76e1-4bbc-8bb9-1d205e7b618a",
+        "label": "market analysis",
+        "skillType": "knowledge",
+        "reuseLevel": "cross-sector",
+        "confidence": "high",
+        "probability": 0.942
+      }
+    ],
+    "develop pricing strategies": [
+      {
+        "uri": "http://data.europa.eu/esco/skill/1c460d2d-90c6-4fc9-ad49-febb6e15605a",
+        "label": "pricing strategies",
+        "skillType": "knowledge",
+        "reuseLevel": "cross-sector",
+        "confidence": "high",
+        "probability": 0.957
+      },
+      {
+        "uri": "http://data.europa.eu/esco/skill/183134a2-3f8e-4a38-9e81-35c2bec0272b",
+        "label": "set up pricing strategies",
+        "skillType": "skill/competence",
+        "reuseLevel": "sector-specific",
+        "confidence": "high",
+        "probability": 0.955
+      }
+    ],
+    "create sales materials": [],
+    "write content": [
+      {
+        "uri": "http://data.europa.eu/esco/skill/be40c4c3-a855-4d67-9ca5-6f4428c34b0d",
+        "label": "provide written content",
+        "skillType": "skill/competence",
+        "reuseLevel": "cross-sector",
+        "confidence": "high",
+        "probability": 0.953
+      },
+      {
+        "uri": "http://data.europa.eu/esco/skill/d822b4b2-26c7-4bd9-970d-229c6504f615",
+        "label": "create digital content",
+        "skillType": "skill/competence",
+        "reuseLevel": "transversal",
+        "confidence": "medium",
+        "probability": 0.782
+      },
+      {
+        "uri": "http://data.europa.eu/esco/skill/e74f4f21-8d45-412c-b5c3-652e6167ee32",
+        "label": "content development processes",
+        "skillType": "knowledge",
+        "reuseLevel": "cross-sector",
+        "confidence": "medium",
+        "probability": 0.688
+      }
+    ],
+    "use CRM software": [
+      {
+        "uri": "http://data.europa.eu/esco/skill/9889b795-d755-41b2-8afd-2e3c87a65a38",
+        "label": "use customer relationship management software",
+        "skillType": "skill/competence",
+        "reuseLevel": "cross-sector",
+        "confidence": "high",
+        "probability": 0.964
+      }
+    ],
+    "plan marketing campaigns": [
+      {
+        "uri": "http://data.europa.eu/esco/skill/9c6e951f-aa88-4890-983d-e7a6ee49f5bb",
+        "label": "plan marketing campaigns",
+        "skillType": "skill/competence",
+        "reuseLevel": "cross-sector",
+        "confidence": "high",
+        "probability": 0.942
+      },
+      {
+        "uri": "http://data.europa.eu/esco/skill/90398aca-82b7-4f56-8e0f-814d949162b4",
+        "label": "coordinate marketing plan actions",
+        "skillType": "skill/competence",
+        "reuseLevel": "cross-sector",
+        "confidence": "medium",
+        "probability": 0.721
+      },
+      {
+        "uri": "http://data.europa.eu/esco/skill/08fd2839-670c-4f16-8024-97437f2035ab",
+        "label": "plan marketing strategy",
+        "skillType": "skill/competence",
+        "reuseLevel": "cross-sector",
+        "confidence": "medium",
+        "probability": 0.701
+      }
+    ],
+    "identify new customers": [
+      {
+        "uri": "http://data.europa.eu/esco/skill/6d97bf55-6fb6-4795-8282-3ef915ae0bb8",
+        "label": "prospect new customers",
+        "skillType": "skill/competence",
+        "reuseLevel": "sector-specific",
+        "confidence": "high",
+        "probability": 0.962
+      },
+      {
+        "uri": "http://data.europa.eu/esco/skill/d207a30b-2f80-4138-9b77-f88d549b8768",
+        "label": "identify new business opportunities",
+        "skillType": "skill/competence",
+        "reuseLevel": "cross-sector",
+        "confidence": "high",
+        "probability": 0.879
+      }
+    ]
+  }
+}
