@@ -24,7 +24,6 @@ import os
 import sys
 from typing import Literal
 
-import httpx
 from google import genai
 from google.genai import types
 from pydantic import BaseModel, Field
@@ -35,8 +34,7 @@ DEFAULT_MODEL = os.environ.get("GEMINI_MODEL", "gemini-flash-latest")
 CANDIDATES_PER_STATEMENT = 15
 
 # Selection via the Decisions API (calibrated yes/no probabilities).
-# The Python SDK's client.decisions needs google-genai >= 3.2 (not installable on Python 3.10), so we call REST.
-DECISIONS_URL = "https://generativelanguage.googleapis.com/v1beta/decisions"
+# Needs google-genai >= 3.2 and the v1beta API version.
 DECISIONS_MODEL = "gemini-decision-1"
 HIGH_THRESHOLD = 0.8     # probability >= this -> "high"
 MEDIUM_THRESHOLD = 0.5   # probability >= this -> "medium", below -> dropped
@@ -116,7 +114,8 @@ class SkillMapper:
     def __init__(self, model=DEFAULT_MODEL, index=None, selector="decisions"):
         if not os.environ.get("GEMINI_API_KEY"):
             raise SystemExit("GEMINI_API_KEY is not set.")
-        self.client = genai.Client()
+        # v1beta: required for the Decisions API (generateContent works there too).
+        self.client = genai.Client(http_options={"api_version": "v1beta"})
         self.model = model
         self.selector = selector  # "decisions" or "llm"
         self.index = index or SkillIndex()
@@ -180,15 +179,13 @@ class SkillMapper:
         probs = {}
         items = list(questions.items())
         for start in range(0, len(items), 1000):
-            response = httpx.post(
-                DECISIONS_URL,
-                headers={"x-goog-api-key": os.environ["GEMINI_API_KEY"]},
-                json={"model": DECISIONS_MODEL, "input": shared_input, "questions": dict(items[start:start + 1000])},
-                timeout=120,
+            response = self.client.decisions.create(
+                model=DECISIONS_MODEL,
+                input=shared_input,
+                questions=dict(items[start:start + 1000]),
             )
-            response.raise_for_status()
-            for key, answer in response.json()["answers"].items():
-                probs[key] = answer["noul"]
+            for key, answer in response.answers.items():
+                probs[key] = answer.noul
 
         picks = []
         for i in range(len(statements)):

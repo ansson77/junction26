@@ -19,7 +19,7 @@ import json
 
 import numpy as np
 
-from build_index import META_PATH, QUERY_PREFIX, VECTORS_PATH
+from build_index import META_PATH, QUERY_PREFIX, VECTORS_PATH, load_model
 
 SKILL_TYPES = {"skill": "skill/competence", "knowledge": "knowledge"}
 
@@ -38,8 +38,7 @@ class SkillIndex:
     @property
     def model(self):
         if self._model is None:
-            from sentence_transformers import SentenceTransformer
-            self._model = SentenceTransformer(self.model_name, device="cpu")
+            self._model = load_model(self.model_name)
         return self._model
 
     def embed(self, texts):

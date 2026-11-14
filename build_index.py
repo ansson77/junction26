@@ -36,6 +36,18 @@ QUERY_PREFIX = "query: "
 CHUNK_SIZE = 1000
 
 
+def load_model(name=MODEL_NAME):
+    """Load the embedding model from the local Hugging Face cache, without
+    contacting the Hub (faster, works offline, no HF_TOKEN warning).
+    Downloads it only if it isn't cached yet (e.g. a teammate's first run)."""
+    from sentence_transformers import SentenceTransformer
+    try:
+        return SentenceTransformer(name, device="cpu", local_files_only=True)
+    except OSError:
+        print(f"Model {name} not cached yet, downloading from Hugging Face...")
+        return SentenceTransformer(name, device="cpu")
+
+
 def load_skills(limit=None):
     with open(SKILLS_CSV, newline="", encoding="utf-8") as f:
         rows = [
@@ -73,13 +85,11 @@ def main():
     parser.add_argument("--batch-size", type=int, default=32)
     args = parser.parse_args()
 
-    from sentence_transformers import SentenceTransformer
-
     rows = load_skills(args.limit)
     texts = [skill_text(r) for r in rows]
     print(f"{len(rows)} skills to embed with {MODEL_NAME}")
 
-    model = SentenceTransformer(MODEL_NAME, device="cpu")
+    model = load_model()
 
     # Cache key includes the model and row count so a changed setup never reuses stale chunks.
     run_dir = PARTS_DIR / f"{MODEL_NAME.replace('/', '__')}_{len(rows)}"

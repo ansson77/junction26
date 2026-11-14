@@ -1,9 +1,11 @@
+# Python 3.14 (google-genai >= 3.2, needed for the Decisions API, does not support 3.10).
+# Setup:  uv venv --python 3.14 .venv && uv pip install --python .venv/bin/python -r requirements.txt --index-strategy unsafe-best-match
+
 # CPU-only PyTorch (no CUDA download). Remove this line if you have a GPU.
 --extra-index-url https://download.pytorch.org/whl/cpu
 
 torch==2.14.1
 sentence-transformers==6.3.0
 numpy==2.2.6
-google-genai==2.33.0
+google-genai==3.3.0
 pydantic==2.14.3
-httpx==0.28.1
