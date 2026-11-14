@@ -40,28 +40,123 @@ text ──► 1. Extract ──► 2. Retrieve ──► 3. Select ──► ES
 | [matching.py](matching.py) | Matches jobs and applicants on their points: soft cosine score + coverage, with a per-skill explanation. No LLM |
 | [db.py](db.py) | SQLite storage (`data/app.db`, gitignored) for job profiles and applicant profiles, one row per skill with its points |
 | [api.py](api.py) | FastAPI app: the HTTP API for the frontend, see [Backend API](#backend-api-for-the-frontend) |
+| [seed_mock.py](seed_mock.py) | Demo data: about 15 jobs and 85 anonymous applicants (ids start with `mock-`) |
+| [frontend/](frontend/) | The website (React + Vite), see [The frontend](#the-frontend-in-frontend) |
 | [tests/](tests/) | `pytest` tests for matching and the API (need the index; no Gemini, the API tests use a stub) |
 | `data/validation_questions.json` | Cache of validation questions, one per skill and language. Same skill → same question for everyone |
 
 Both flows are stateless. Each step takes the data it needs as arguments and returns it, so a web backend can call them one request at a time.
 
-## Setup
+## Setup and running the website
 
-Needs Python 3.14 and [uv](https://docs.astral.sh/uv/). Runs on Linux, Windows and Apple Silicon Macs. It does not run on Intel Macs, see [Windows and macOS](#windows-and-macos).
+The website has two parts that run side by side: the **backend** (FastAPI, Python, in the repo root) and the **frontend** (React, in `frontend/`). You need both running to use the site.
+
+### 1. Install the tools
+
+| Tool | Version | Check with |
+|---|---|---|
+| Python | 3.14 | `python3 --version` |
+| [uv](https://docs.astral.sh/uv/) | any recent | `uv --version` |
+| [Node.js](https://nodejs.org/) and npm | 18 or newer | `node --version` |
+
+It runs on Linux, Windows and Apple Silicon Macs, but not on Intel Macs. See [Windows and macOS](#windows-and-macos).
+
+### 2. Install the backend
+
+From the repo root:
 
 ```bash
 uv venv --python 3.14 .venv
 uv pip install --python .venv/bin/python -r requirements.txt --index-strategy unsafe-best-match
-export GEMINI_API_KEY=...
 ```
 
-Get the ESCO index. The easiest way is to copy `esco/skills.npy` and `esco/skills_meta.json` from a teammate into `esco/`. The files work on every platform. That folder is gitignored. To build the index yourself, download the ESCO CSVs (English) into `esco/` and run the command below. It takes about 18 minutes on a laptop CPU and can be resumed if interrupted.
+### 3. Get the ESCO index
+
+The backend needs `esco/skills.npy` and `esco/skills_meta.json`. The `esco/` folder is gitignored, so pick one way to get them:
+
+- **Easiest:** copy both files from a teammate into `esco/`. They work on every platform.
+- **Build them yourself:** download the ESCO CSVs (English) into `esco/`, then run `.venv/bin/python build_index.py`. It takes about 18 minutes on a laptop CPU, and you can resume it if it stops.
+
+The first start downloads the embedding model (`intfloat/multilingual-e5-small`) from Hugging Face, so you need internet once.
+
+### 4. Set the Gemini API key
+
+The AI steps (skill suggestions, clarifying questions, new validation questions) use Gemini. Set the key in **the terminal where you start the backend**:
 
 ```bash
-.venv/bin/python build_index.py
+export GEMINI_API_KEY=...               # Windows PowerShell: $env:GEMINI_API_KEY="..."
 ```
 
-The first search downloads the embedding model (`intfloat/multilingual-e5-small`) from Hugging Face, so it needs internet once.
+Without it, the backend stops at startup with `GEMINI_API_KEY is not set.`
+
+### 5. Load demo data (optional)
+
+To get about 15 jobs and 85 applicants for demos and matching:
+
+```bash
+.venv/bin/python seed_mock.py           # replaces all mock-* entries in data/app.db
+.venv/bin/python seed_mock.py --clear   # removes them again
+```
+
+It only touches ids that start with `mock-`, never real profiles. It needs `GEMINI_API_KEY` only if a mock skill has no cached validation question.
+
+### 6. Start the backend (terminal 1)
+
+```bash
+.venv/bin/uvicorn api:app --reload      # Windows: .venv\Scripts\uvicorn api:app --reload
+```
+
+Wait for `Application startup complete`, which takes a few seconds while it loads the index and the model. Check it with http://127.0.0.1:8000/api/health or the interactive API docs at http://127.0.0.1:8000/docs. Leave this terminal open.
+
+### 7. Start the frontend (terminal 2)
+
+The first time, install the packages:
+
+```bash
+cd frontend
+npm install
+```
+
+Then pick one way to run it:
+
+| | Command (in `frontend/`) | Open | Use it when |
+|---|---|---|---|
+| **Dev server** | `npm run dev` | http://localhost:5173 | You are changing the frontend. Edits reload instantly. |
+| **Built** | `npm run build` | http://127.0.0.1:8000 | Demos. The backend serves `frontend/dist` itself, so only terminal 1 must keep running. Run `npm run build` again after frontend changes. |
+
+The dev server forwards every `/api/...` request to the backend on `127.0.0.1:8000`, so the backend from step 6 must be running.
+
+### Every time after the first setup
+
+```bash
+# terminal 1, repo root
+export GEMINI_API_KEY=...
+.venv/bin/uvicorn api:app --reload
+
+# terminal 2
+cd frontend && npm run dev              # then open http://localhost:5173
+```
+
+### Tests
+
+```bash
+.venv/bin/python -m pytest tests/       # backend; uses a Gemini stub, so no key needed (needs the ESCO index)
+cd frontend && npx tsc --noEmit         # frontend type check
+```
+
+### Troubleshooting
+
+| What you see | Cause and fix |
+|---|---|
+| `http proxy error ... ECONNREFUSED 127.0.0.1:8000` in the `npm run dev` terminal, or "The API server didn't answer" on the page | The backend isn't running. Start it (step 6) and reload the page. |
+| Home page says "Server not reachable" | Same cause: start the backend. |
+| Backend exits with `GEMINI_API_KEY is not set.` | Set the key in that terminal (step 4). |
+| Backend exits with `esco/skills.npy not found` | Put `skills.npy` and `skills_meta.json` in `esco/` (step 3). |
+| "Gemini request failed: ..." on the page | Gemini was busy or the key is wrong. Click **Try again**. |
+| Address already in use on port 8000 | Another uvicorn is still running. Stop it, or find it with `lsof -i :8000`. |
+| `npm run dev` fails with a syntax error | Node is too old. Check `node --version` is 18 or newer. |
+| Jobs and Applicants pages are empty | No data yet. Create profiles in the site, or load the demo data (step 5). |
+| Changes don't show at http://127.0.0.1:8000 | That is the built frontend. Run `npm run build` again, or use the dev server. |
 
 ### Windows and macOS
 
@@ -131,12 +226,7 @@ SkillMapper().map_text(text, role="applicant")
 
 ### Run it
 
-```bash
-export GEMINI_API_KEY=...
-.venv/bin/uvicorn api:app --reload          # Windows: .venv\Scripts\uvicorn api:app --reload
-```
-
-Startup takes a few seconds while it loads the ESCO index and the embedding model. Then open **http://127.0.0.1:8000/docs** to try every endpoint with its exact schema. The server stops at startup with a clear message if `GEMINI_API_KEY` or `esco/skills.npy` is missing.
+See [Setup and running the website](#setup-and-running-the-website), steps 6 and 7. The interactive docs at **http://127.0.0.1:8000/docs** show every endpoint with its exact schema.
 
 - **Local only.** The server listens on `127.0.0.1` and has no login, so only your own machine can reach it. Every endpoint is open to anyone who can connect, including the ones that return validation answers. Don't start it with `--host 0.0.0.0`.
 - **One process.** Don't use `--workers`. Each worker would load its own copy of the index and the model, and they would share one SQLite file and one question cache.
@@ -147,6 +237,16 @@ Both setups below avoid hard-coded hosts: call the API with relative URLs such a
 
 - **Built frontend:** put the build output in `frontend/dist`, or set `FRONTEND_DIR` to another folder. `api.py` serves it at `http://127.0.0.1:8000/` from the same server. This needs no CORS and has one URL to open.
 - **Dev server** (Vite, Next and so on): run it next to the API and proxy `/api` to `http://127.0.0.1:8000`. CORS also allows any `localhost` or `127.0.0.1` origin, so calling the API directly works too.
+
+### The frontend in `frontend/`
+
+A React + TypeScript app built with Vite. It has these screens:
+- the applicant flow
+- the employer flow
+- the job list, and a job page with applicants ranked best first
+- the applicant list, and an applicant page with matching jobs (the applicant's feedback view)
+
+All API calls are in [frontend/src/api.ts](frontend/src/api.ts). How to run it is in [step 7](#7-start-the-frontend-terminal-2). The app uses hash URLs (`/#/jobs/<id>`), so deep links also work from the built version.
 
 ### Endpoints
 

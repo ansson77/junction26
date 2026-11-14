@@ -34,6 +34,8 @@ from google.genai import errors as genai_errors
 from pydantic import BaseModel, Field, ValidationError
 
 import db
+from bizdev import BizDevAgent
+from bizdev.api import router as bizdev
 from applicant import ApplicantFlow, ApplicantProfile, make_applicant_profile, skills_to_validate
 from employer import QA, Clarification, EmployerFlow, JobProfile, JobSpec, make_job_profile
 from matching import MatchResult, SkillSimilarity, rank_applicants, rank_jobs
@@ -345,6 +347,7 @@ def create_app(mapper=None, sim=None, db_path=None, frontend_dir=FRONTEND_DIR):
         app.state.mapper = m
         app.state.applicant = ApplicantFlow(m)
         app.state.employer = EmployerFlow(m)
+        app.state.bizdev = BizDevAgent(mapper=m)
         app.state.sim = sim or SkillSimilarity(m.index)
         app.state.known_uris = {s["uri"] for s in m.index.skills}
         app.state.db_path = db_path or db.DB_PATH
@@ -364,7 +367,7 @@ def create_app(mapper=None, sim=None, db_path=None, frontend_dir=FRONTEND_DIR):
     def health(request: Request):
         return {"status": "ok", "esco_skills": len(request.app.state.known_uris)}
 
-    for router in (employer, applicant, jobs, applicants):
+    for router in (employer, applicant, jobs, applicants, bizdev):
         api.include_router(router)
     app.include_router(api)
 
