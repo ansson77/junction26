@@ -1,15 +1,22 @@
 # Junction 2026: Espoo skills matching
 
-Helou pöytäläiset! We match applicants and employers on real job requirements and on skills people rank themselves. The vision is in [PLAN.md](PLAN.md), the background research in [RESEARCH.md](RESEARCH.md), and the challenge in [CHALLENGE.md](CHALLENGE.md).
+This is the demo for team Pöytä at Junction 2026.
+Our solution uses AI to help people describe themselves, while keeping people in charge of all decisions. AI is never the judge of people.
+
+We make both applicants and companies focus on what they actually need, by having them spend points on the skills/requirements they deem most important.
+
+For companies that don't know what they need, we provide tailored development suggestions, that are turned into concrete hiring targets.
 
 ## How it works
 
 Both sides describe themselves in plain language. The AI turns that text into [ESCO](https://esco.ec.europa.eu/) skills, and the person then decides what is true.
 
-- **Applicant:** CV or free text → AI suggests skills → applicant keeps, removes or adds skills → spends 10 points on at most 5 skills → answers one validation question for each of the 2 skills with the most points, in their own words.
+- **Applicant:** CV or free text → AI suggests skills → applicant keeps, removes or adds skills → spends 10 points on at most 5 skills → answers one validation question for each of the 2 skills with the most points, in their own words → picks the languages they speak (outside the point budget).
 - **Employer:** job ad or task list → AI asks clarifying questions (up to 2 rounds) → concrete tasks with priorities → ESCO skills → recruiter spends 10 points on the skills that matter most.
 
 **Matching:** both sides spend 10 points, so each profile is a priority distribution over ESCO skills. The score is a *soft cosine* between the two distributions: similar but different ESCO skills count partly (e.g. *troubleshoot* ≈ *debug software*), using calibrated similarities between the precomputed skill embeddings. Next to the score, *coverage* says how many of the employer's 10 points the applicant covers, and every employer skill is explained ("covered by X", "similar to Y", "not covered"). Matching is a fixed formula over skill data, with no LLM.
+
+**Recruiter view:** the shortlist ranks applicants for a job, can filter them by spoken language, and lets the recruiter invite applicants to the event's networking session. Applications are anonymous by default; profiles store no names at all, so the "show names" switch only shows invented demo names.
 
 **AI Act principle:** our AI never evaluates people (EU AI Act, Annex III 4(a), high-risk). It only helps applicants describe themselves and helps employers describe jobs. Points and answers are self-declared. Validation answers are shown to recruiters verbatim and are never sent to an LLM.
 
@@ -19,12 +26,12 @@ Both sides describe themselves in plain language. The AI turns that text into [E
 
 ```
 text ──► 1. Extract ──► 2. Retrieve ──► 3. Select ──► ESCO skills + evidence
-         Gemini         local           Gemini
-                        embeddings      Decisions API
+         Gemini         embedding       Gemini
+                        search          Decisions API
 ```
 
 1. **Extract** (`gemini-flash-latest`): splits the text into short, English, ESCO-style statements ("perform bookkeeping"), each with the exact quote it came from. There are separate prompts for applicants and employers.
-2. **Retrieve** (`multilingual-e5-small`, runs locally): finds the 15 most similar of the 13,955 ESCO skills for each statement. These candidates are similar in wording but not necessarily correct.
+2. **Retrieve**: finds the 15 most similar of the ~13,900 ESCO skills for each statement. By default the statement is embedded with `gemini-embedding-001` and compared against the precomputed vectors in `index/search.npy`; with `SKILL_INDEX=local` it uses `multilingual-e5-small` on your machine instead. These candidates are similar in wording but not necessarily correct.
 3. **Select** (`gemini-decision-1`): asks one yes/no question per statement–candidate pair and gets a calibrated probability. Probability ≥ 0.8 is `high`, ≥ 0.5 is `medium`, and anything lower is dropped. The model can only choose from the candidates, so it can't invent skill codes.
 
 ### Files
@@ -32,18 +39,22 @@ text ──► 1. Extract ──► 2. Retrieve ──► 3. Select ──► ES
 | File | What it does |
 |---|---|
 | [build_index.py](build_index.py) | Embeds `esco/skills_en.csv` once and saves `esco/skills.npy` and `esco/skills_meta.json` |
-| [search.py](search.py) | `SkillIndex`: embedding search over the index (step 2 on its own, no Gemini) |
+| [build_deploy_index.py](build_deploy_index.py) | Builds the committed `index/` folder (Gemini search vectors + e5 matching vectors) used by default and on Vercel |
+| [search.py](search.py) | `SkillIndex`: embedding search over the index (step 2 on its own) |
 | [map_skills.py](map_skills.py) | `SkillMapper`: the full pipeline, steps 1–3 |
 | [points.py](points.py) | Point budget rules (10 points) shared by applicants and employers |
 | [applicant.py](applicant.py) | `ApplicantFlow` and `ApplicantProfile`: suggestions, search, validation questions; `make_applicant_profile()` builds the profile from the applicant's choices |
 | [employer.py](employer.py) | `EmployerFlow` and `JobProfile`: clarify, build spec, map skills; `make_job_profile()` builds the job profile from the recruiter's points |
 | [matching.py](matching.py) | Matches jobs and applicants on their points: soft cosine score + coverage, with a per-skill explanation. No LLM |
-| [db.py](db.py) | SQLite storage (`data/app.db`, gitignored) for job profiles and applicant profiles, one row per skill with its points |
+| [db.py](db.py) | Storage for job and applicant profiles (one row per skill with its points), spoken languages and networking invites. SQLite (`data/app.db`, gitignored) locally, Supabase Postgres when `DATABASE_URL` is set |
+| [migrate_to_supabase.py](migrate_to_supabase.py) | Copies `data/app.db` into Supabase. Safe to run twice |
+| [supabase/schema.sql](supabase/schema.sql) | The Postgres schema (also created automatically on first connect) |
 | [api.py](api.py) | FastAPI app: the HTTP API for the frontend, see [Backend API](#backend-api-for-the-frontend) |
-| [seed_mock.py](seed_mock.py) | Demo data: about 15 jobs and 85 anonymous applicants (ids start with `mock-`) |
+| [seed_mock.py](seed_mock.py) | Demo data: 15 jobs and about 90 anonymous applicants with spoken languages (ids start with `mock-`) |
 | [bizdev/](bizdev/PLAN.md) | Business development agent: company diagnosis → ideas → tasks → ESCO skills, under `/api/bizdev` |
 | [frontend/](frontend/) | The website (React + Vite), see [The frontend](#the-frontend-in-frontend) |
 | [tests/](tests/) | `pytest` tests for matching and the API (need the index; no Gemini, the API tests use a stub) |
+| [demo/feedback-email.html](demo/feedback-email.html) | Static mockup of the feedback email applicants get after the event (not wired to the backend) |
 | `data/validation_questions.json` | Cache of validation questions, one per skill and language. Same skill → same question for everyone |
 
 Both flows are stateless. Each step takes the data it needs as arguments and returns it, so a web backend can call them one request at a time.
@@ -96,7 +107,7 @@ Without it, the backend stops at startup with `GEMINI_API_KEY is not set.`
 
 ### 5. Load demo data (optional)
 
-To get about 15 jobs and 85 applicants for demos and matching:
+To get 15 jobs and about 90 applicants for demos and matching:
 
 ```bash
 .venv/bin/python seed_mock.py           # replaces all mock-* entries in data/app.db
@@ -149,6 +160,8 @@ export GEMINI_API_KEY=...        # set it inside tmux; a running tmux may not ha
 while true; do .venv/bin/uvicorn api:app --host 0.0.0.0 --port 8000; echo "crashed, restarting"; sleep 2; done
 ```
 
+`--host 0.0.0.0` makes the site reachable from other machines on the network, with no login. Use it only on the event network, see [Run it](#run-it).
+
 ### Tests
 
 ```bash
@@ -163,7 +176,7 @@ cd frontend && npx tsc --noEmit         # frontend type check
 | `http proxy error ... ECONNREFUSED 127.0.0.1:8000` in the `npm run dev` terminal, or "The API server didn't answer" on the page | The backend isn't running. Start it (step 6) and reload the page. |
 | Home page says "Server not reachable" | Same cause: start the backend. |
 | Backend exits with `GEMINI_API_KEY is not set.` | Set the key in that terminal (step 4). |
-| Backend exits with `esco/skills.npy not found` | Put `skills.npy` and `skills_meta.json` in `esco/` (step 3). |
+| Backend exits with `esco/skills.npy not found` | You set `SKILL_INDEX=local`. Put `skills.npy` and `skills_meta.json` in `esco/` (step 3), or unset it to use the committed `index/`. |
 | "Gemini request failed: ..." on the page | Gemini was busy or the key is wrong. Click **Try again**. |
 | Address already in use on port 8000 | Another uvicorn is still running. Stop it, or find it with `lsof -i :8000`. |
 | `npm run dev` fails with a syntax error | Node is too old. Check `node --version` is 18 or newer. |
@@ -240,7 +253,7 @@ SkillMapper().map_text(text, role="applicant")
 
 See [Setup and running the website](#setup-and-running-the-website), steps 6 and 7. The interactive docs at **http://127.0.0.1:8000/docs** show every endpoint with its exact schema.
 
-- **Local only.** The server listens on `127.0.0.1` and has no login, so only your own machine can reach it. Every endpoint is open to anyone who can connect, including the ones that return validation answers. Don't start it with `--host 0.0.0.0`.
+- **No login.** By default the server listens on `127.0.0.1`, so only your own machine can reach it. Every endpoint is open to anyone who can connect, including the ones that return validation answers. Start it with `--host 0.0.0.0`, or deploy it ([DEPLOY.md](DEPLOY.md)), only for the event and delete the data afterwards.
 - **One process.** Don't use `--workers`. Each worker would load its own copy of the index and the model, and they would share one SQLite file and one question cache.
 
 ### Hosting the frontend on the same machine
@@ -255,11 +268,11 @@ Both setups below avoid hard-coded hosts: call the API with relative URLs such a
 A React + TypeScript app built with Vite. It has these screens:
 - the applicant flow
 - the employer flow
-- the shortlist (`/#/shortlist`): pick a job to see its description and the applicants ordered by a 0–100 match score
+- the shortlist (`/#/shortlist`): pick a job to see its description and the applicants ordered by a 0–100 match score. Filter by spoken language, invite applicants to networking (and show only invited ones), and switch anonymous mode off to see invented demo names ([frontend/src/demoNames.ts](frontend/src/demoNames.ts))
 - the applicant list, and an applicant page with matching jobs (the applicant's feedback view)
 - business development (`/#/bizdev`, the [bizdev/](bizdev/PLAN.md) module): company → A/B diagnosis → ideas → confirmed tasks → ESCO skills. The result can be downloaded as JSON, or ranked with points and saved as a job so matching finds people for the work
 
-All API calls are in [frontend/src/api.ts](frontend/src/api.ts). How to run it is in [step 7](#7-start-the-frontend-terminal-2). The app uses hash URLs (`/#/jobs/<id>`), so deep links also work from the built version.
+All API calls are in [frontend/src/api.ts](frontend/src/api.ts). How to run it is in [step 7](#7-start-the-frontend-terminal-2). The app uses hash URLs (`/#/shortlist/<id>`), so deep links also work from the built version.
 
 ### Endpoints
 
@@ -285,9 +298,9 @@ Clarification runs in rounds. Call `clarify` first. If `is_clear_enough` is fals
 | `POST /api/applicant/suggest` | `{text}` | `ApplicantFlow.suggest_skills` | AI suggestions, each with `uri`, `label`, `skillType`, `evidence` (quotes from the text) |
 | `GET /api/applicant/search?q=...&k=5` | — | `ApplicantFlow.search_skills` | Matching skills, each with `uri`, `label`, `skillType`, `description`, `score`. No Gemini |
 | `POST /api/applicant/questions` | `{allocation: {uri: points}, language: "English"}` | `skills_to_validate` + `ApplicantFlow.questions_for` | `{uri: question}` for the 2 skills with the most points (ties: first in `allocation`) |
-| `POST /api/applicant/profile` | `{skills, allocation: {uri: points}, questions: {uri: question}, answers: {uri: answer}}` | `make_applicant_profile` + `db.save_applicant` | `{id, profile: ApplicantProfile}` |
+| `POST /api/applicant/profile` | `{skills, allocation: {uri: points}, questions: {uri: question}, answers: {uri: answer}, languages: [name]}` | `make_applicant_profile` + `db.save_applicant` | `{id, profile: ApplicantProfile}` |
 
-`skills` lists the confirmed skills, each with `uri`, `label`, `skillType` and `origin` (`"suggested"` for a kept AI suggestion, `"added"` for one found with search). The applicant confirms suggestions before spending points, so only confirmed skills are sent. Call `/questions` after the points are spent, since the points decide which skills get a question. `/profile` keeps questions and answers only for those top skills and ignores any others.
+`skills` lists the confirmed skills, each with `uri`, `label`, `skillType` and `origin` (`"suggested"` for a kept AI suggestion, `"added"` for one found with search). The applicant confirms suggestions before spending points, so only confirmed skills are sent. Call `/questions` after the points are spent, since the points decide which skills get a question. `/profile` keeps questions and answers only for those top skills and ignores any others. `languages` is optional: plain names such as `"Finnish"`, trimmed and de-duplicated, at most 20. The frontend offers common ones (`COMMON_LANGUAGES` in [frontend/src/api.ts](frontend/src/api.ts)) and accepts any other.
 
 **Stored profiles and matching**
 
@@ -300,7 +313,7 @@ Clarification runs in rounds. Call `clarify` first. If `is_clear_enough` is fals
 | `GET /api/jobs/{id}/invites` | Applicant ids invited to the networking session for this job, in invite order |
 | `PUT /api/jobs/{id}/invites/{applicant_id}` | 204. Invites the applicant (again is fine) |
 | `DELETE /api/jobs/{id}/invites/{applicant_id}` | 204. Withdraws the invite (again is fine) |
-| `GET /api/applicants` | All applicants: `id`, `created_at`, `n_skills`, `skills` (labels) |
+| `GET /api/applicants` | All applicants: `id`, `created_at`, `n_skills`, `skills` (labels), `languages` |
 | `GET /api/applicants/{id}` | `ApplicantProfile`, including the validation answers |
 | `GET /api/applicants/{id}/matches` | Jobs for this applicant, best first: list of `MatchResult` |
 | `DELETE /api/applicants/{id}` | 204 |
@@ -331,12 +344,12 @@ The backend enforces these rules. The UI should also respect them, so people see
 - **Uniqueness:** each skill URI appears once.
 - **Never send validation answers to an AI endpoint.** Answers go only to `/api/applicant/profile` and on to recruiters. Do not add an endpoint that sends answers to Gemini or any other LLM.
 - **AI suggestions are not decisions.** Show them as suggestions. The applicant or recruiter confirms each one.
-- **No personal details.** Profiles have no name, photo, age or nationality. Don't add those fields in the UI.
+- **No personal details.** Profiles have no name, photo, age or nationality. Don't add those fields in the UI. Spoken languages are the only personal attribute, chosen by the applicant, and they never affect the match score.
 
 ### Good to know
 
 - **First calls for new skills are slow.** The first `questions` call for a skill nobody has chosen before asks Gemini. After that, the question comes from `data/validation_questions.json`. Writes to that file are serialised inside the server.
-- **Storage is one SQLite file**, `data/app.db`, created on first use. `db.py list` and `db.py show <id>` read it from the terminal while the server runs. Validation answers can contain personal details, so delete the file after the event.
+- **Storage is one SQLite file** locally, `data/app.db`, created on first use (or Supabase when `DATABASE_URL` is set). `db.py list` and `db.py show <id>` read it from the terminal while the server runs. Validation answers can contain personal details, so delete the data after the event.
 - **Terminal-only helpers.** `allocate_in_terminal`, `ask_in_terminal` and `allocate_job_points` are for the CLI. The web version replaces them with forms that send `allocation` and `answers`.
 
 ### Quick test
